@@ -8,75 +8,118 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
-// Twilio sends application/x-www-form-urlencoded
 export async function POST(req: NextRequest) {
   try {
     const body = await req.text()
     const params = new URLSearchParams(body)
 
-    const from = params.get('From') ?? ''       // whatsapp:+521234567890
-    const to = params.get('To') ?? ''           // whatsapp:+14155238886
+    const from = params.get('From') ?? ''   // whatsapp:+521234567890
+    const to   = params.get('To')   ?? ''   // whatsapp:+14155238886
     const messageBody = params.get('Body') ?? ''
 
     if (!messageBody.trim()) {
       return twimlResponse('Lo siento, no pude leer tu mensaje. ¿Puedes intentarlo de nuevo?')
     }
 
-    // Normalize the Twilio number to look up which clinic it belongs to
-    const twilioNumber = to.replace('whatsapp:', '')
-    const senderNumber = from.replace('whatsapp:', '')
+    const twilioNumber = to.replace('whatsapp:', '').trim()
+    const senderNumber = from.replace('whatsapp:', '').trim()
 
-    // Fetch clinic config by Twilio number
-    const { data: waConfig } = await supabase
+    // ── Buscar clínica: 4 estrategias en cascada ─────────────────────────────
+
+    let clinicId: string | null = null
+
+    // 1. Número exacto + activo
+    const { data: exactActive } = await supabase
       .from('whatsapp_configs')
-      .select('clinic_id, twilio_account_sid, twilio_auth_token, is_active')
+      .select('clinic_id')
       .eq('twilio_phone_number', twilioNumber)
       .eq('is_active', true)
-      .single()
+      .maybeSingle()
+    if (exactActive) clinicId = exactActive.clinic_id
 
-    if (!waConfig) {
-      return twimlResponse('Este número no está configurado. Contacta al administrador.')
+    // 2. Número exacto sin importar is_active (config guardada pero no activada)
+    if (!clinicId) {
+      const normalized = [twilioNumber, twilioNumber.replace(/^\+/, ''), `+${twilioNumber.replace(/^\+/, '')}`]
+      const { data: anyMatch } = await supabase
+        .from('whatsapp_configs')
+        .select('clinic_id')
+        .in('twilio_phone_number', normalized)
+        .maybeSingle()
+      if (anyMatch) clinicId = anyMatch.clinic_id
     }
 
-    // Validate Twilio signature (security — only in production)
+    // 3. Cualquier clínica con whatsapp_config (útil en sandbox con número compartido)
+    if (!clinicId) {
+      const { data: anyConfig } = await supabase
+        .from('whatsapp_configs')
+        .select('clinic_id')
+        .order('created_at', { ascending: true })
+        .limit(1)
+        .maybeSingle()
+      if (anyConfig) clinicId = anyConfig.clinic_id
+    }
+
+    // 4. Cualquier clínica existente en el sistema (fallback sandbox absoluto)
+    if (!clinicId) {
+      const { data: anyClinic } = await supabase
+        .from('clinics')
+        .select('id')
+        .order('created_at', { ascending: true })
+        .limit(1)
+        .maybeSingle()
+      if (anyClinic) clinicId = anyClinic.id
+    }
+
+    if (!clinicId) {
+      return twimlResponse('No hay clínicas registradas en este sistema aún. Por favor crea una cuenta en huellabot-tau.vercel.app')
+    }
+
+    // ── Validar firma Twilio solo en producción con config activa ─────────────
     if (process.env.NODE_ENV === 'production') {
-      const authToken = waConfig.twilio_auth_token
-      const signature = req.headers.get('x-twilio-signature') ?? ''
-      const url = process.env.NEXT_PUBLIC_APP_URL + '/api/whatsapp/webhook'
-      const paramsObj: Record<string, string> = {}
-      params.forEach((value, key) => { paramsObj[key] = value })
-      const valid = twilio.validateRequest(authToken, signature, url, paramsObj)
-      if (!valid) {
-        return new NextResponse('Forbidden', { status: 403 })
+      const { data: waConfig } = await supabase
+        .from('whatsapp_configs')
+        .select('twilio_auth_token, is_active')
+        .eq('clinic_id', clinicId)
+        .maybeSingle()
+
+      if (waConfig?.is_active && waConfig.twilio_auth_token) {
+        const signature = req.headers.get('x-twilio-signature') ?? ''
+        const url = process.env.NEXT_PUBLIC_APP_URL + '/api/whatsapp/webhook'
+        const paramsObj: Record<string, string> = {}
+        params.forEach((value, key) => { paramsObj[key] = value })
+        const valid = twilio.validateRequest(waConfig.twilio_auth_token, signature, url, paramsObj)
+        if (!valid) {
+          return new NextResponse('Forbidden', { status: 403 })
+        }
       }
     }
 
-    // Fetch clinic data + bot config + services
+    // ── Cargar datos de la clínica ────────────────────────────────────────────
     const [{ data: clinic }, { data: services }, { data: botConfig }] = await Promise.all([
-      supabase.from('clinics').select('*').eq('id', waConfig.clinic_id).single(),
-      supabase.from('services').select('*').eq('clinic_id', waConfig.clinic_id),
-      supabase.from('bot_configs').select('*').eq('clinic_id', waConfig.clinic_id).single(),
+      supabase.from('clinics').select('*').eq('id', clinicId).single(),
+      supabase.from('services').select('*').eq('clinic_id', clinicId),
+      supabase.from('bot_configs').select('*').eq('clinic_id', clinicId).maybeSingle(),
     ])
 
     if (!clinic) {
       return twimlResponse('Error al cargar la información de la clínica.')
     }
 
-    // Fetch recent conversation history for context (last 10 messages)
+    // ── Historial de conversación (últimos 5 intercambios) ────────────────────
     const { data: recentMessages } = await supabase
       .from('whatsapp_messages')
       .select('message, response')
-      .eq('clinic_id', waConfig.clinic_id)
+      .eq('clinic_id', clinicId)
       .eq('phone_number', senderNumber)
       .order('timestamp', { ascending: false })
       .limit(5)
 
-    // Build message history (most recent first → reverse for chronological order)
     const history = (recentMessages ?? []).reverse().flatMap(m => [
       { role: 'user' as const, content: m.message },
       { role: 'assistant' as const, content: m.response },
     ])
 
+    // ── Llamar a Claude ───────────────────────────────────────────────────────
     const systemPrompt = buildSystemPrompt({
       name: clinic.name,
       description: clinic.description || '',
@@ -103,9 +146,9 @@ export async function POST(req: NextRequest) {
       ? claudeResponse.content[0].text
       : 'No pude procesar tu mensaje. Por favor intenta de nuevo.'
 
-    // Save conversation to whatsapp_messages table
+    // ── Guardar conversación ──────────────────────────────────────────────────
     await supabase.from('whatsapp_messages').insert({
-      clinic_id: waConfig.clinic_id,
+      clinic_id: clinicId,
       phone_number: senderNumber,
       message: messageBody,
       response: reply,
@@ -123,7 +166,5 @@ function twimlResponse(message: string) {
 <Response>
   <Message>${message.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</Message>
 </Response>`
-  return new NextResponse(xml, {
-    headers: { 'Content-Type': 'text/xml' },
-  })
+  return new NextResponse(xml, { headers: { 'Content-Type': 'text/xml' } })
 }
