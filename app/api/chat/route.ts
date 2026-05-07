@@ -75,9 +75,7 @@ export async function POST(req: NextRequest) {
       bot_name: botConfig?.bot_name || 'Asistente Virtual',
       bot_tone: botConfig?.bot_tone || 'amigable y profesional',
       extra_info: clinic.extra_info || '',
-    }) + (calendarToken
-      ? '\n\nPUEDES AGENDAR CITAS: Cuando el cliente quiera una cita, usa check_availability para ver horarios disponibles, luego recopila nombre, mascota y servicio, y usa book_appointment para confirmar.'
-      : '\n\nPARA CITAS: indica al cliente que llame al teléfono de la clínica para agendar.')
+    }) + '\n\nPUEDES AGENDAR CITAS: Cuando el cliente quiera una cita, usa check_availability para ver horarios disponibles, luego recopila nombre del dueño, nombre de la mascota y servicio, y finalmente usa book_appointment para confirmar. Siempre confirma los datos antes de agendar.'
 
     // Agendar con agentic loop (máx 3 iteraciones para tool use)
     let currentMessages = messages.map((m: { role: string; content: string }) => ({
@@ -95,7 +93,7 @@ export async function POST(req: NextRequest) {
         model: 'claude-sonnet-4-6',
         max_tokens: 600,
         system: systemPrompt,
-        tools: calendarToken ? bookingTools : [],
+        tools: bookingTools,
         messages: currentMessages,
       })
 

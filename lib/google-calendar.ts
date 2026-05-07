@@ -131,3 +131,135 @@ function generateDefaultSlots(): string[] {
   return ['9:00 AM', '9:30 AM', '10:00 AM', '10:30 AM', '11:00 AM', '11:30 AM',
           '12:00 PM', '3:00 PM', '3:30 PM', '4:00 PM', '4:30 PM', '5:00 PM']
 }
+
+// ── Sincronización bidireccional ─────────────────────────────────────────────
+
+export async function registerWebhook(clinicId: string) {
+  const client = await getCalendarClient(clinicId)
+  if (!client) return
+
+  const { calendar, calendarId } = client
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL!
+  const channelId = `huellabot-${clinicId}-${Date.now()}`
+
+  try {
+    const { data } = await calendar.events.watch({
+      calendarId,
+      requestBody: {
+        id: channelId,
+        type: 'web_hook',
+        address: `${appUrl}/api/calendar/webhook`,
+        token: clinicId,
+        // Google Calendar webhooks duran máx 7 días — renovamos en cada sync
+        expiration: String(Date.now() + 7 * 24 * 60 * 60 * 1000),
+      },
+    })
+
+    await supabaseAdmin.from('google_calendar_tokens').update({
+      channel_id: data.id ?? channelId,
+      channel_expiry: Number(data.expiration ?? 0),
+    }).eq('clinic_id', clinicId)
+  } catch (err) {
+    console.warn('[registerWebhook] failed (non-critical):', err)
+  }
+}
+
+export async function syncCalendarEvents(clinicId: string) {
+  const client = await getCalendarClient(clinicId)
+  if (!client) return
+
+  const { calendar, calendarId } = client
+
+  const { data: tokenRow } = await supabaseAdmin
+    .from('google_calendar_tokens')
+    .select('sync_token')
+    .eq('clinic_id', clinicId)
+    .single()
+
+  let events
+  try {
+    if (tokenRow?.sync_token) {
+      // Sync incremental — solo cambios desde la última vez
+      const res = await calendar.events.list({ calendarId, syncToken: tokenRow.sync_token, singleEvents: true })
+      events = res.data
+    } else {
+      // Sync inicial — últimos 30 días y próximos 60
+      const timeMin = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
+      const timeMax = new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString()
+      const res = await calendar.events.list({ calendarId, timeMin, timeMax, singleEvents: true, maxResults: 250 })
+      events = res.data
+    }
+  } catch (err: unknown) {
+    // 410 Gone = syncToken expirado, hacer full sync
+    if ((err as { code?: number }).code === 410) {
+      await supabaseAdmin.from('google_calendar_tokens').update({ sync_token: '' }).eq('clinic_id', clinicId)
+      return syncCalendarEvents(clinicId)
+    }
+    throw err
+  }
+
+  // Guardar el nuevo syncToken para la próxima vez
+  if (events.nextSyncToken) {
+    await supabaseAdmin.from('google_calendar_tokens')
+      .update({ sync_token: events.nextSyncToken })
+      .eq('clinic_id', clinicId)
+  }
+
+  const items = events.items ?? []
+
+  for (const event of items) {
+    if (!event.start?.dateTime && !event.start?.date) continue
+
+    const appointmentAt = new Date(event.start.dateTime ?? event.start.date ?? '')
+    const googleEventId = event.id!
+    const isCancelled = event.status === 'cancelled'
+
+    // Si el evento fue cancelado en Google Cal, cancelar en Supabase también
+    if (isCancelled) {
+      await supabaseAdmin.from('appointments')
+        .update({ status: 'cancelled' })
+        .eq('clinic_id', clinicId)
+        .eq('google_event_id', googleEventId)
+      continue
+    }
+
+    // Upsert: si el evento ya existe en appointments (por google_event_id), actualizar
+    // Si es nuevo (creado manualmente en Google Cal), insertarlo
+    const existing = await supabaseAdmin
+      .from('appointments')
+      .select('id')
+      .eq('clinic_id', clinicId)
+      .eq('google_event_id', googleEventId)
+      .maybeSingle()
+
+    const summary = event.summary ?? ''
+    const description = event.description ?? ''
+
+    // Parsear datos del evento — intentamos extraer nombre/mascota de la descripción
+    const patientMatch = description.match(/Paciente:\s*(.+)/i)
+    const petMatch = description.match(/Mascota:\s*(.+)/i)
+    const serviceMatch = description.match(/Servicio:\s*(.+)/i)
+    const phoneMatch = description.match(/Teléfono:\s*(.+)/i)
+
+    const appointmentData = {
+      clinic_id: clinicId,
+      patient_name: patientMatch?.[1]?.trim() || summary,
+      pet_name: petMatch?.[1]?.trim() || '',
+      service: serviceMatch?.[1]?.trim() || summary,
+      patient_phone: phoneMatch?.[1]?.trim() || '',
+      appointment_at: appointmentAt.toISOString(),
+      google_event_id: googleEventId,
+      status: 'confirmed' as const,
+      notes: description,
+    }
+
+    if (existing?.data) {
+      await supabaseAdmin.from('appointments').update({
+        appointment_at: appointmentData.appointment_at,
+        status: appointmentData.status,
+      }).eq('id', existing.data.id)
+    } else {
+      await supabaseAdmin.from('appointments').insert(appointmentData)
+    }
+  }
+}

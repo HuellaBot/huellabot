@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { getOAuthClient } from '@/lib/google-calendar'
+import { getOAuthClient, registerWebhook, syncCalendarEvents } from '@/lib/google-calendar'
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -27,7 +27,14 @@ export async function GET(req: NextRequest) {
       refresh_token: tokens.refresh_token!,
       expiry_date: tokens.expiry_date ?? null,
       calendar_id: 'primary',
+      sync_token: '',
     }, { onConflict: 'clinic_id' })
+
+    // Sync inicial + registrar webhook para cambios futuros (en paralelo, no bloqueante)
+    Promise.all([
+      syncCalendarEvents(clinicId),
+      registerWebhook(clinicId),
+    ]).catch(err => console.warn('[google/callback] post-connect sync failed:', err))
 
     return NextResponse.redirect(`${appUrl}/dashboard/settings?connected=google`)
   } catch (err) {
