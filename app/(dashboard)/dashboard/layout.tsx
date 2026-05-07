@@ -1,7 +1,7 @@
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
-import { LayoutDashboard, Settings, LogOut, ExternalLink } from 'lucide-react'
+import { LayoutDashboard, Settings, LogOut, ExternalLink, CalendarDays } from 'lucide-react'
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const supabase = createClient()
@@ -50,6 +50,13 @@ export default async function DashboardLayout({ children }: { children: React.Re
           >
             <LayoutDashboard size={18} />
             Panel principal
+          </Link>
+          <Link
+            href="/dashboard/appointments"
+            className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-brand-200 hover:bg-brand-700 hover:text-white transition-colors"
+          >
+            <CalendarDays size={18} />
+            Citas
           </Link>
           <Link
             href="/dashboard/settings"
