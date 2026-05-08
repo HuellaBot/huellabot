@@ -55,8 +55,8 @@ export async function POST(req: NextRequest) {
     }
 
     case 'invoice.payment_failed': {
-      const invoice  = event.data.object as Stripe.Invoice
-      const subId    = invoice.subscription as string
+      const invoice  = event.data.object as Stripe.Invoice & { subscription?: string }
+      const subId    = invoice.subscription
       if (!subId) break
       const sub      = await stripe.subscriptions.retrieve(subId)
       const clinicId = getClinicId(sub)
@@ -70,9 +70,10 @@ export async function POST(req: NextRequest) {
 }
 
 async function updateSubscription(clinicId: string, sub: Stripe.Subscription) {
+  const periodEnd = (sub as unknown as { current_period_end: number }).current_period_end
   await supabase.from('clinics').update({
     stripe_subscription_id: sub.id,
     subscription_status:    sub.status,
-    subscription_ends_at:   new Date(sub.current_period_end * 1000).toISOString(),
+    subscription_ends_at:   periodEnd ? new Date(periodEnd * 1000).toISOString() : null,
   }).eq('id', clinicId)
 }
