@@ -2,8 +2,9 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { WhatsAppSettings } from '@/components/dashboard/WhatsAppSettings'
 import { CalendarConnect } from '@/components/dashboard/CalendarConnect'
+import { SubscriptionCard } from '@/components/dashboard/SubscriptionCard'
 
-export default async function SettingsPage({ searchParams }: { searchParams: { connected?: string; error?: string } }) {
+export default async function SettingsPage({ searchParams }: { searchParams: { connected?: string; error?: string; subscribed?: string } }) {
   const supabase = createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
@@ -35,7 +36,17 @@ export default async function SettingsPage({ searchParams }: { searchParams: { c
         </div>
       )}
 
+      {searchParams.subscribed === 'true' && (
+        <div className="mb-6 bg-green-50 border border-green-200 rounded-xl px-4 py-3 text-sm text-green-700">
+          ✓ Suscripción activada. ¡Bienvenida a Huella Bot Pro!
+        </div>
+      )}
+
       <div className="space-y-6">
+        <SubscriptionCard
+          status={clinic.subscription_status ?? null}
+          endsAt={clinic.subscription_ends_at ?? null}
+        />
         <CalendarConnect clinicId={clinic.id} isConnected={!!calToken} connectedAt={calToken?.created_at} />
         <WhatsAppSettings clinicId={clinic.id} initialConfig={waConfig} />
       </div>
