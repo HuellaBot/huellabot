@@ -27,12 +27,12 @@ const bookingTools: Parameters<typeof anthropic.messages.create>[0]['tools'] = [
     input_schema: {
       type: 'object' as const,
       properties: {
-        patient_name: { type: 'string' },
-        pet_name:     { type: 'string' },
-        service:      { type: 'string' },
+        patient_name:   { type: 'string' },
+        pet_name:       { type: 'string' },
+        service:        { type: 'string' },
         appointment_at: { type: 'string', description: 'ISO 8601, ej: 2026-05-10T10:00:00' },
-        phone:  { type: 'string' },
-        notes:  { type: 'string' },
+        phone:          { type: 'string' },
+        notes:          { type: 'string' },
       },
       required: ['patient_name', 'pet_name', 'service', 'appointment_at'],
     },
@@ -44,8 +44,8 @@ export async function POST(req: NextRequest) {
     const body = await req.text()
     const params = new URLSearchParams(body)
 
-    const from = params.get('From') ?? ''
-    const to   = params.get('To')   ?? ''
+    const from        = params.get('From') ?? ''
+    const to          = params.get('To')   ?? ''
     const messageBody = params.get('Body') ?? ''
 
     if (!messageBody.trim()) {
@@ -54,112 +54,91 @@ export async function POST(req: NextRequest) {
 
     const twilioNumber = to.replace('whatsapp:', '').trim()
     const senderNumber = from.replace('whatsapp:', '').trim()
+    const normalized   = [twilioNumber, twilioNumber.replace(/^\+/, ''), `+${twilioNumber.replace(/^\+/, '')}`]
 
-    // ── Buscar clínica: 4 estrategias en cascada ─────────────────────────────
+    // ── Todas las búsquedas en paralelo ──────────────────────────────────────
+    const [configByNumber, anyConfig, anyClinic] = await Promise.all([
+      supabase.from('whatsapp_configs').select('clinic_id, twilio_auth_token, is_active')
+        .in('twilio_phone_number', normalized).maybeSingle(),
+      supabase.from('whatsapp_configs').select('clinic_id')
+        .order('created_at', { ascending: true }).limit(1).maybeSingle(),
+      supabase.from('clinics').select('id')
+        .order('created_at', { ascending: true }).limit(1).maybeSingle(),
+    ])
 
-    let clinicId: string | null = null
-
-    const { data: exactActive } = await supabase
-      .from('whatsapp_configs').select('clinic_id')
-      .eq('twilio_phone_number', twilioNumber).eq('is_active', true).maybeSingle()
-    if (exactActive) clinicId = exactActive.clinic_id
-
-    if (!clinicId) {
-      const normalized = [twilioNumber, twilioNumber.replace(/^\+/, ''), `+${twilioNumber.replace(/^\+/, '')}`]
-      const { data: anyMatch } = await supabase
-        .from('whatsapp_configs').select('clinic_id')
-        .in('twilio_phone_number', normalized).maybeSingle()
-      if (anyMatch) clinicId = anyMatch.clinic_id
-    }
-
-    if (!clinicId) {
-      const { data: anyConfig } = await supabase
-        .from('whatsapp_configs').select('clinic_id')
-        .order('created_at', { ascending: true }).limit(1).maybeSingle()
-      if (anyConfig) clinicId = anyConfig.clinic_id
-    }
-
-    if (!clinicId) {
-      const { data: anyClinic } = await supabase
-        .from('clinics').select('id')
-        .order('created_at', { ascending: true }).limit(1).maybeSingle()
-      if (anyClinic) clinicId = anyClinic.id
-    }
+    const clinicId: string | null =
+      configByNumber.data?.clinic_id ??
+      anyConfig.data?.clinic_id ??
+      anyClinic.data?.id ??
+      null
 
     if (!clinicId) {
       return twimlResponse('No hay clínicas registradas en este sistema aún.')
     }
 
-    // ── Validar firma Twilio solo en producción con config activa ─────────────
-    if (process.env.NODE_ENV === 'production') {
-      const { data: waConfig } = await supabase
-        .from('whatsapp_configs').select('twilio_auth_token, is_active')
-        .eq('clinic_id', clinicId).maybeSingle()
-
-      if (waConfig?.is_active && waConfig.twilio_auth_token) {
-        const signature = req.headers.get('x-twilio-signature') ?? ''
-        const url = process.env.NEXT_PUBLIC_APP_URL + '/api/whatsapp/webhook'
-        const paramsObj: Record<string, string> = {}
-        params.forEach((value, key) => { paramsObj[key] = value })
-        if (!twilio.validateRequest(waConfig.twilio_auth_token, signature, url, paramsObj)) {
-          return new NextResponse('Forbidden', { status: 403 })
-        }
+    // ── Validar firma Twilio si hay config activa ────────────────────────────
+    const waConfig = configByNumber.data
+    if (process.env.NODE_ENV === 'production' && waConfig?.is_active && waConfig.twilio_auth_token) {
+      const signature = req.headers.get('x-twilio-signature') ?? ''
+      const url       = process.env.NEXT_PUBLIC_APP_URL + '/api/whatsapp/webhook'
+      const paramsObj: Record<string, string> = {}
+      params.forEach((value, key) => { paramsObj[key] = value })
+      if (!twilio.validateRequest(waConfig.twilio_auth_token, signature, url, paramsObj)) {
+        return new NextResponse('Forbidden', { status: 403 })
       }
     }
 
-    // ── Cargar datos de la clínica ────────────────────────────────────────────
-    const [{ data: clinic }, { data: services }, { data: botConfig }] = await Promise.all([
+    // ── Cargar datos de clínica e historial en paralelo ──────────────────────
+    const [
+      { data: clinic },
+      { data: services },
+      { data: botConfig },
+      { data: recentMessages },
+    ] = await Promise.all([
       supabase.from('clinics').select('*').eq('id', clinicId).single(),
       supabase.from('services').select('*').eq('clinic_id', clinicId),
       supabase.from('bot_configs').select('*').eq('clinic_id', clinicId).maybeSingle(),
+      supabase.from('whatsapp_messages').select('message, response')
+        .eq('clinic_id', clinicId).eq('phone_number', senderNumber)
+        .order('timestamp', { ascending: false }).limit(6),
     ])
 
     if (!clinic) return twimlResponse('Error al cargar la información de la clínica.')
 
-    // ── Historial de conversación (últimos 6 intercambios) ────────────────────
-    const { data: recentMessages } = await supabase
-      .from('whatsapp_messages').select('message, response')
-      .eq('clinic_id', clinicId).eq('phone_number', senderNumber)
-      .order('timestamp', { ascending: false }).limit(6)
-
     const history = (recentMessages ?? []).reverse().flatMap(m => [
-      { role: 'user' as const, content: m.message },
+      { role: 'user' as const,      content: m.message  },
       { role: 'assistant' as const, content: m.response },
     ])
 
     const systemPrompt = buildSystemPrompt({
-      name: clinic.name,
+      name:       clinic.name,
       description: clinic.description || '',
-      services: services || [],
-      hours: clinic.hours || '',
-      phone: clinic.phone || '',
-      address: clinic.address || '',
-      bot_name: botConfig?.bot_name || 'Asistente Virtual',
-      bot_tone: botConfig?.bot_tone || 'amigable y profesional',
+      services:   services || [],
+      hours:      clinic.hours || '',
+      phone:      clinic.phone || '',
+      address:    clinic.address || '',
+      bot_name:   botConfig?.bot_name || 'Asistente Virtual',
+      bot_tone:   botConfig?.bot_tone || 'amigable y profesional',
       extra_info: clinic.extra_info || '',
-    }) + `\n\nFECHA ACTUAL: ${new Date().toLocaleDateString('es-MX', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'America/Mexico_City' })}. Usa siempre el año correcto al agendar.\n\nESTÁS EN WHATSAPP: sé conciso (máximo 3 párrafos cortos). Usa emojis con moderación. Puedes agendar citas directamente con las herramientas disponibles.`
+    }) + `\n\nFECHA ACTUAL: ${new Date().toLocaleDateString('es-MX', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'America/Mexico_City' })}. Usa siempre el año correcto.\n\nESTÁS EN WHATSAPP: sé conciso (máximo 3 párrafos cortos). Usa emojis con moderación. Puedes agendar citas directamente con las herramientas disponibles.`
 
-    // ── Agentic loop (máx 3 iteraciones para tool use) ───────────────────────
+    // ── Agentic loop (máx 2 iteraciones para respetar timeout de Twilio) ─────
     let currentMessages = [
       ...history,
       { role: 'user' as const, content: messageBody },
     ]
-
     let finalReply = ''
-    let iterations = 0
 
-    while (iterations < 3) {
-      iterations++
-
+    for (let i = 0; i < 2; i++) {
       const response = await anthropic.messages.create({
-        model: 'claude-haiku-4-5-20251001',
+        model:      'claude-haiku-4-5-20251001',
         max_tokens: 400,
-        system: systemPrompt,
-        tools: bookingTools,
-        messages: currentMessages,
+        system:     systemPrompt,
+        tools:      bookingTools,
+        messages:   currentMessages,
       })
 
-      if (response.stop_reason === 'end_turn') {
+      if (response.stop_reason !== 'tool_use') {
         finalReply = response.content
           .filter(b => b.type === 'text')
           .map(b => (b as { type: 'text'; text: string }).text)
@@ -167,70 +146,62 @@ export async function POST(req: NextRequest) {
         break
       }
 
-      if (response.stop_reason === 'tool_use') {
-        const toolUseBlocks = response.content.filter(b => b.type === 'tool_use')
-        const toolResults: Array<{ type: 'tool_result'; tool_use_id: string; content: string }> = []
+      const toolUseBlocks  = response.content.filter(b => b.type === 'tool_use')
+      const toolResults: Array<{ type: 'tool_result'; tool_use_id: string; content: string }> = []
 
-        for (const block of toolUseBlocks) {
-          if (block.type !== 'tool_use') continue
-          const input = block.input as Record<string, string>
-          let result = ''
+      await Promise.all(toolUseBlocks.map(async block => {
+        if (block.type !== 'tool_use') return
+        const input = block.input as Record<string, string>
+        let result  = ''
 
-          if (block.name === 'check_availability') {
-            const slots = await getAvailableSlots(clinicId, input.date)
-            result = slots.length > 0
-              ? `Horarios disponibles el ${input.date}: ${slots.join(', ')}`
-              : `No hay horarios disponibles el ${input.date}. Sugiere otra fecha.`
-          }
-
-          if (block.name === 'book_appointment') {
-            try {
-              const res = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/appointments`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  clinicId,
-                  patientName: input.patient_name,
-                  petName: input.pet_name,
-                  service: input.service,
-                  appointmentAt: input.appointment_at,
-                  phone: input.phone || senderNumber,
-                  notes: input.notes || '',
-                }),
-              })
-              const data = await res.json()
-              result = data.message || 'Cita agendada exitosamente.'
-            } catch {
-              result = 'No pude agendar la cita. Por favor llama directamente a la clínica.'
-            }
-          }
-
-          toolResults.push({ type: 'tool_result', tool_use_id: block.id, content: result })
+        if (block.name === 'check_availability') {
+          const slots = await getAvailableSlots(clinicId, input.date)
+          result = slots.length > 0
+            ? `Horarios disponibles el ${input.date}: ${slots.join(', ')}`
+            : `No hay horarios disponibles el ${input.date}. Sugiere otra fecha.`
         }
 
-        currentMessages = [
-          ...currentMessages,
-          { role: 'assistant' as const, content: response.content },
-          { role: 'user' as const, content: toolResults },
-        ]
-        continue
-      }
+        if (block.name === 'book_appointment') {
+          try {
+            const res  = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/appointments`, {
+              method:  'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                clinicId,
+                patientName:   input.patient_name,
+                petName:       input.pet_name,
+                service:       input.service,
+                appointmentAt: input.appointment_at,
+                phone:         input.phone || senderNumber,
+                notes:         input.notes || '',
+              }),
+            })
+            const data = await res.json()
+            result = data.message || 'Cita agendada exitosamente.'
+          } catch {
+            result = 'No pude agendar la cita. Por favor llama directamente a la clínica.'
+          }
+        }
 
-      finalReply = response.content
-        .filter(b => b.type === 'text')
-        .map(b => (b as { type: 'text'; text: string }).text)
-        .join('')
-      break
+        toolResults.push({ type: 'tool_result', tool_use_id: block.id, content: result })
+      }))
+
+      currentMessages = [
+        ...currentMessages,
+        { role: 'assistant' as const, content: response.content },
+        { role: 'user' as const,      content: toolResults },
+      ]
     }
 
     if (!finalReply) finalReply = 'No pude procesar tu mensaje. Por favor intenta de nuevo.'
 
-    await supabase.from('whatsapp_messages').insert({
-      clinic_id: clinicId,
+    // Guardar en background (no bloqueante)
+    supabase.from('whatsapp_messages').insert({
+      clinic_id:    clinicId,
       phone_number: senderNumber,
-      message: messageBody,
-      response: finalReply,
-    })
+      message:      messageBody,
+      response:     finalReply,
+    }).then(() => {})
 
     return twimlResponse(finalReply)
   } catch (err) {
