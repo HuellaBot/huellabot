@@ -137,7 +137,7 @@ export async function POST(req: NextRequest) {
       bot_name: botConfig?.bot_name || 'Asistente Virtual',
       bot_tone: botConfig?.bot_tone || 'amigable y profesional',
       extra_info: clinic.extra_info || '',
-    }) + '\n\nESTÁS EN WHATSAPP: sé conciso (máximo 3 párrafos cortos). Usa emojis con moderación. Puedes agendar citas directamente con las herramientas disponibles.'
+    }) + `\n\nFECHA ACTUAL: ${new Date().toLocaleDateString('es-MX', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'America/Mexico_City' })}. Usa siempre el año correcto al agendar.\n\nESTÁS EN WHATSAPP: sé conciso (máximo 3 párrafos cortos). Usa emojis con moderación. Puedes agendar citas directamente con las herramientas disponibles.`
 
     // ── Agentic loop (máx 3 iteraciones para tool use) ───────────────────────
     let currentMessages = [

@@ -242,10 +242,15 @@ export async function syncCalendarEvents(clinicId: string) {
     const serviceMatch = description.match(/Servicio:\s*(.+)/i)
     const phoneMatch = description.match(/Teléfono:\s*(.+)/i)
 
+    // Skip Google Calendar events with no identifiable patient — likely personal/blocked events
+    const patientName = patientMatch?.[1]?.trim() || ''
+    const petName = petMatch?.[1]?.trim() || ''
+    if (!patientName && !petName && !existing?.data) continue
+
     const appointmentData = {
       clinic_id: clinicId,
-      patient_name: patientMatch?.[1]?.trim() || summary,
-      pet_name: petMatch?.[1]?.trim() || '',
+      patient_name: patientName || summary,
+      pet_name: petName,
       service: serviceMatch?.[1]?.trim() || summary,
       patient_phone: phoneMatch?.[1]?.trim() || '',
       appointment_at: appointmentAt.toISOString(),
