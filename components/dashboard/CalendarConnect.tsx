@@ -1,5 +1,5 @@
 'use client'
-import { Calendar, CheckCircle, ExternalLink, Unlink } from 'lucide-react'
+import { Calendar, CheckCircle, ExternalLink, RefreshCw, Unlink } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
@@ -13,6 +13,8 @@ interface CalendarConnectProps {
 export function CalendarConnect({ clinicId, isConnected, connectedAt }: CalendarConnectProps) {
   const [connected, setConnected] = useState(isConnected)
   const [disconnecting, setDisconnecting] = useState(false)
+  const [syncing, setSyncing] = useState(false)
+  const [syncMsg, setSyncMsg] = useState('')
 
   async function handleDisconnect() {
     setDisconnecting(true)
@@ -20,6 +22,20 @@ export function CalendarConnect({ clinicId, isConnected, connectedAt }: Calendar
     await supabase.from('google_calendar_tokens').delete().eq('clinic_id', clinicId)
     setConnected(false)
     setDisconnecting(false)
+  }
+
+  async function handleSync() {
+    setSyncing(true)
+    setSyncMsg('')
+    try {
+      const res = await fetch('/api/calendar/sync', { method: 'POST' })
+      if (res.ok) setSyncMsg('✓ Sincronización completada')
+      else setSyncMsg('Error al sincronizar')
+    } catch {
+      setSyncMsg('Error al sincronizar')
+    } finally {
+      setSyncing(false)
+    }
   }
 
   return (
@@ -47,11 +63,19 @@ export function CalendarConnect({ clinicId, isConnected, connectedAt }: Calendar
               {connectedAt && ` Conectado el ${new Date(connectedAt).toLocaleDateString('es-MX')}.`}
             </p>
           </div>
-          <Button variant="ghost" size="sm" loading={disconnecting} onClick={handleDisconnect}
-            className="text-red-500 hover:text-red-600 hover:bg-red-50">
-            <Unlink size={14} className="mr-1.5" />
-            Desconectar Google Calendar
-          </Button>
+          <div className="flex items-center gap-2 flex-wrap">
+            <Button variant="ghost" size="sm" loading={syncing} onClick={handleSync}
+              className="text-blue-600 hover:text-blue-700 hover:bg-blue-50">
+              <RefreshCw size={14} className={`mr-1.5 ${syncing ? 'animate-spin' : ''}`} />
+              Sincronizar ahora
+            </Button>
+            <Button variant="ghost" size="sm" loading={disconnecting} onClick={handleDisconnect}
+              className="text-red-500 hover:text-red-600 hover:bg-red-50">
+              <Unlink size={14} className="mr-1.5" />
+              Desconectar
+            </Button>
+          </div>
+          {syncMsg && <p className="text-xs text-green-600">{syncMsg}</p>}
         </div>
       ) : (
         <div className="space-y-4">

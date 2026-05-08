@@ -30,8 +30,8 @@ export async function GET(req: NextRequest) {
       sync_token: '',
     }, { onConflict: 'clinic_id' })
 
-    // Sync inicial + registrar webhook para cambios futuros (en paralelo, no bloqueante)
-    Promise.all([
+    // Sync inicial + registrar webhook — awaited so serverless doesn't kill them before completion
+    await Promise.all([
       syncCalendarEvents(clinicId),
       registerWebhook(clinicId),
     ]).catch(err => console.warn('[google/callback] post-connect sync failed:', err))
