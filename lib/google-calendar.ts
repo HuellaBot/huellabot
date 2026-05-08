@@ -59,8 +59,9 @@ export async function getAvailableSlots(
   if (!client) return generateDefaultSlots()
 
   const { calendar, calendarId } = client
-  const dayStart = new Date(`${dateStr}T08:00:00`)
-  const dayEnd = new Date(`${dateStr}T18:00:00`)
+  // Mexico City is UTC-6 permanently (abolished DST in 2023)
+  const dayStart = new Date(`${dateStr}T08:00:00-06:00`)
+  const dayEnd = new Date(`${dateStr}T18:00:00-06:00`)
 
   const { data } = await calendar.freebusy.query({
     requestBody: {
@@ -83,7 +84,7 @@ export async function getAvailableSlots(
     })
   }).map(slot => {
     const d = new Date(slot)
-    return d.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: true })
+    return d.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'America/Mexico_City' })
   })
 }
 

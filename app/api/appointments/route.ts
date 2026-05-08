@@ -16,7 +16,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Faltan campos requeridos' }, { status: 400 })
     }
 
-    const appointmentDate = new Date(appointmentAt)
+    // If Claude sends bare ISO (no timezone), treat as Mexico City time (UTC-6)
+    const hasTimezone = /Z$|[+-]\d{2}:?\d{2}$/.test(appointmentAt)
+    const appointmentDate = new Date(hasTimezone ? appointmentAt : `${appointmentAt}-06:00`)
 
     // Save to Supabase
     const { data: appointment, error } = await supabase
@@ -55,7 +57,7 @@ export async function POST(req: NextRequest) {
       success: true,
       appointmentId: appointment.id,
       googleEventId,
-      message: `Cita confirmada para ${patientName} el ${appointmentDate.toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long' })} a las ${appointmentDate.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}`,
+      message: `Cita confirmada para ${patientName} el ${appointmentDate.toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'America/Mexico_City' })} a las ${appointmentDate.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Mexico_City' })}`,
     })
   } catch (err) {
     console.error('[appointments/route]', err)

@@ -95,16 +95,18 @@ export default async function AppointmentsPage() {
   )
 }
 
+const MX_TZ = 'America/Mexico_City'
+
 function AppointmentCard({ appointment: a, badge }: { appointment: Record<string, string>; badge: React.ReactNode }) {
   const date = new Date(a.appointment_at)
   return (
     <div className="bg-white rounded-2xl border border-gray-100 p-4 flex items-center gap-4">
       <div className="w-14 h-14 bg-brand-50 rounded-xl flex flex-col items-center justify-center flex-shrink-0">
         <span className="text-brand-700 font-bold text-lg leading-none">
-          {date.getDate()}
+          {date.toLocaleString('es-MX', { day: 'numeric', timeZone: MX_TZ })}
         </span>
         <span className="text-brand-500 text-xs">
-          {date.toLocaleString('es-MX', { month: 'short' })}
+          {date.toLocaleString('es-MX', { month: 'short', timeZone: MX_TZ })}
         </span>
       </div>
       <div className="flex-1 min-w-0">
@@ -115,7 +117,7 @@ function AppointmentCard({ appointment: a, badge }: { appointment: Record<string
         </div>
         <div className="flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-gray-500">
           <span className="flex items-center gap-1"><PawPrint size={11} />{a.pet_name || '—'}</span>
-          <span className="flex items-center gap-1"><Clock size={11} />{date.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' })}</span>
+          <span className="flex items-center gap-1"><Clock size={11} />{date.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', timeZone: MX_TZ })}</span>
           {a.patient_phone && <span className="flex items-center gap-1"><Phone size={11} />{a.patient_phone}</span>}
           {a.service && <span className="flex items-center gap-1"><User size={11} />{a.service}</span>}
         </div>
