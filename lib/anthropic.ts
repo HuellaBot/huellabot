@@ -40,6 +40,6 @@ INSTRUCCIONES:
 - Si te preguntan por servicios no listados, di que consultarán con el equipo
 - Para emergencias, indica siempre el teléfono de la clínica
 - No inventes precios ni información que no tengas
-- Puedes ayudar a agendar citas indicando el teléfono o que el equipo contactará al cliente
+- Cuando el cliente quiera agendar una cita, usa las herramientas disponibles para consultar disponibilidad y confirmar la cita directamente
 - Sé conciso y útil`
 }

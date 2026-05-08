@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { Calendar, Clock, User, PawPrint, Phone, CheckCircle, XCircle } from 'lucide-react'
+import { CancelAppointmentButton } from '@/components/dashboard/CancelAppointmentButton'
 
 export default async function AppointmentsPage() {
   const supabase = createClient()
@@ -110,10 +111,13 @@ function AppointmentCard({ appointment: a, badge }: { appointment: Record<string
         </span>
       </div>
       <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 mb-1">
+        <div className="flex items-center gap-2 mb-1 flex-wrap">
           <span className="font-semibold text-gray-900 text-sm">{a.patient_name}</span>
           {badge}
           {a.google_event_id && <span className="text-xs text-blue-500">📅 Google Cal</span>}
+          {a.status === 'confirmed' && new Date(a.appointment_at) >= new Date() && (
+            <CancelAppointmentButton appointmentId={a.id} />
+          )}
         </div>
         <div className="flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-gray-500">
           <span className="flex items-center gap-1"><PawPrint size={11} />{a.pet_name || '—'}</span>
