@@ -2,7 +2,7 @@
 import { useState } from 'react'
 import { CreditCard, CheckCircle, AlertCircle, Clock } from 'lucide-react'
 import { Button } from '@/components/ui/Button'
-import { isSubscriptionActive } from '@/lib/stripe'
+import { isSubscriptionActive } from '@/lib/subscription'
 
 interface SubscriptionCardProps {
   status: string | null
