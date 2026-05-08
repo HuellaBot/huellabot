@@ -37,7 +37,7 @@ export default function UpgradePage() {
 
         <div className="bg-white rounded-2xl border border-gray-100 p-8 shadow-sm">
           <div className="flex items-baseline gap-1 mb-6">
-            <span className="text-4xl font-bold text-gray-900">$299</span>
+            <span className="text-4xl font-bold text-gray-900">$2,500</span>
             <span className="text-gray-400">MXN / mes</span>
           </div>
 

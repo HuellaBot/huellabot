@@ -46,7 +46,7 @@ export function SubscriptionCard({ status, endsAt }: SubscriptionCardProps) {
         </div>
         <div>
           <h2 className="font-semibold text-gray-900">Suscripción</h2>
-          <p className="text-sm text-gray-500">Plan Huella Bot Pro — $299 MXN/mes</p>
+          <p className="text-sm text-gray-500">Plan Huella Bot Pro — $2,500 MXN/mes</p>
         </div>
         {info && (
           <span className={`ml-auto flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full ${info.color}`}>

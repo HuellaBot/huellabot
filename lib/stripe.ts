@@ -8,7 +8,7 @@ export const PLANS = {
   monthly: {
     name: 'Huella Bot Pro',
     priceId: process.env.STRIPE_PRICE_ID!,
-    amount: 29900, // MXN cents — shown in UI, actual amount set in Stripe
+    amount: 250000, // $2,500 MXN — shown in UI, actual amount set in Stripe
   },
 }
 
