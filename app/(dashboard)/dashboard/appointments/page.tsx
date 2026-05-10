@@ -38,27 +38,23 @@ export default async function AppointmentsPage() {
   return (
     <div className="max-w-4xl">
       <div className="mb-8">
-        <h1 className="text-2xl font-bold text-gray-900">Citas agendadas</h1>
-        <p className="text-gray-500 mt-1">Todas las citas de {clinic.name}</p>
+        <h1 className="text-2xl font-bold text-brand-navy">Citas agendadas</h1>
+        <p className="text-gray-400 mt-1">Todas las citas de {clinic.name}</p>
       </div>
 
       {/* Stats */}
       <div className="grid grid-cols-3 gap-4 mb-8">
         {[
-          { label: 'Próximas citas', value: upcoming.length, icon: Calendar, color: 'bg-brand-100 text-brand-700' },
-          { label: 'Total este mes', value: (appointments ?? []).filter(a => new Date(a.appointment_at).getMonth() === new Date().getMonth()).length, icon: Clock, color: 'bg-blue-100 text-blue-700' },
-          { label: 'Completadas', value: (appointments ?? []).filter(a => a.status === 'completed').length, icon: CheckCircle, color: 'bg-green-100 text-green-700' },
+          { label: 'Próximas citas', value: upcoming.length, icon: Calendar, color: 'bg-brand-100 text-brand-teal' },
+          { label: 'Total este mes', value: (appointments ?? []).filter(a => new Date(a.appointment_at).getMonth() === new Date().getMonth()).length, icon: Clock, color: 'bg-blue-50 text-brand-blue' },
+          { label: 'Completadas', value: (appointments ?? []).filter(a => a.status === 'completed').length, icon: CheckCircle, color: 'bg-green-50 text-green-500' },
         ].map(s => (
-          <div key={s.label} className="bg-white rounded-2xl border border-gray-100 p-5">
-            <div className="flex items-center gap-3">
-              <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${s.color}`}>
-                <s.icon size={17} />
-              </div>
-              <div>
-                <p className="text-xs text-gray-500">{s.label}</p>
-                <p className="text-lg font-bold text-gray-900">{s.value}</p>
-              </div>
+          <div key={s.label} className="bg-white rounded-2xl p-5 shadow-sm shadow-black/[0.04]">
+            <div className={`w-9 h-9 rounded-xl flex items-center justify-center mb-4 ${s.color}`}>
+              <s.icon size={17} />
             </div>
+            <p className="text-2xl font-bold text-brand-navy">{s.value}</p>
+            <p className="text-sm text-gray-400 mt-0.5">{s.label}</p>
           </div>
         ))}
       </div>
@@ -102,11 +98,11 @@ function AppointmentCard({ appointment: a, badge }: { appointment: Record<string
   const date = new Date(a.appointment_at)
   return (
     <div className="bg-white rounded-2xl border border-gray-100 p-4 flex items-center gap-4">
-      <div className="w-14 h-14 bg-brand-50 rounded-xl flex flex-col items-center justify-center flex-shrink-0">
-        <span className="text-brand-700 font-bold text-lg leading-none">
+      <div className="w-14 h-14 bg-brand-100 rounded-xl flex flex-col items-center justify-center flex-shrink-0">
+        <span className="text-brand-navy font-bold text-lg leading-none">
           {date.toLocaleString('es-MX', { day: 'numeric', timeZone: MX_TZ })}
         </span>
-        <span className="text-brand-500 text-xs">
+        <span className="text-brand-teal text-xs font-medium">
           {date.toLocaleString('es-MX', { month: 'short', timeZone: MX_TZ })}
         </span>
       </div>

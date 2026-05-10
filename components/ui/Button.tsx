@@ -21,11 +21,11 @@ export function Button({
     <button
       disabled={disabled || loading}
       className={clsx(
-        'inline-flex items-center justify-center font-semibold rounded-xl transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2 disabled:opacity-60 disabled:cursor-not-allowed',
+        'inline-flex items-center justify-center font-semibold rounded-xl transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-brand-teal/40 focus:ring-offset-2 disabled:opacity-60 disabled:cursor-not-allowed',
         {
-          'bg-brand-700 text-white hover:bg-brand-800 active:scale-[0.98] shadow-sm': variant === 'primary',
-          'bg-white text-brand-700 border-2 border-brand-700 hover:bg-brand-50': variant === 'secondary',
-          'text-brand-700 hover:bg-brand-50': variant === 'ghost',
+          'bg-brand-teal text-white hover:bg-brand-500 active:scale-[0.98] shadow-sm': variant === 'primary',
+          'bg-white text-brand-navy border-2 border-brand-navy/20 hover:border-brand-teal hover:text-brand-teal': variant === 'secondary',
+          'text-brand-navy hover:bg-brand-navy/5': variant === 'ghost',
           'px-3 py-1.5 text-sm': size === 'sm',
           'px-5 py-2.5 text-sm': size === 'md',
           'px-7 py-3.5 text-base': size === 'lg',

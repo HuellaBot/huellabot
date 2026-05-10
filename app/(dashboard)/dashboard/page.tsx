@@ -46,23 +46,19 @@ export default async function DashboardPage() {
   return (
     <div className="max-w-4xl">
       <div className="mb-8">
-        <h1 className="text-2xl font-bold text-gray-900">Panel de control</h1>
-        <p className="text-gray-500 mt-1">Configura y gestiona el chatbot de {clinic.name}</p>
+        <h1 className="text-2xl font-bold text-brand-navy">Panel de control</h1>
+        <p className="text-gray-400 mt-1">Configura y gestiona el chatbot de {clinic.name}</p>
       </div>
 
       {/* Stats */}
       <div className="grid grid-cols-3 gap-4 mb-8">
         {stats.map((s) => (
-          <div key={s.label} className="bg-white rounded-2xl border border-gray-100 p-5">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 bg-brand-100 rounded-lg flex items-center justify-center">
-                <s.icon size={17} className="text-brand-700" />
-              </div>
-              <div>
-                <p className="text-xs text-gray-500">{s.label}</p>
-                <p className="text-lg font-bold text-gray-900">{s.value}</p>
-              </div>
+          <div key={s.label} className="bg-white rounded-2xl p-5 shadow-sm shadow-black/[0.04]">
+            <div className="w-9 h-9 bg-brand-100 rounded-xl flex items-center justify-center mb-4">
+              <s.icon size={17} className="text-brand-teal" />
             </div>
+            <p className="text-2xl font-bold text-brand-navy">{s.value}</p>
+            <p className="text-sm text-gray-400 mt-0.5">{s.label}</p>
           </div>
         ))}
       </div>

@@ -10,16 +10,22 @@ const config: Config = {
     extend: {
       colors: {
         brand: {
-          50:  '#f0fdf4',
-          100: '#dcfce7',
-          200: '#bbf7d0',
-          300: '#86efac',
-          400: '#4ade80',
-          500: '#52b788',
-          600: '#40916c',
-          700: '#2d6a4f',
-          800: '#1b4332',
-          900: '#081c15',
+          bg:    '#e2eced',
+          teal:  '#43c0af',
+          navy:  '#013847',
+          blue:  '#71b5d8',
+          sand:  '#cda37b',
+          // Shades of teal for hover/active states
+          50:    '#f0faf9',
+          100:   '#d0f2ee',
+          200:   '#a1e6dd',
+          300:   '#72d3cb',
+          400:   '#43c0af',
+          500:   '#34a898',
+          600:   '#26897b',
+          700:   '#1a6b60',
+          800:   '#013847',
+          900:   '#012530',
         },
       },
       fontFamily: {

@@ -21,8 +21,8 @@ export default async function SettingsPage({ searchParams }: { searchParams: { c
   return (
     <div className="max-w-3xl">
       <div className="mb-8">
-        <h1 className="text-2xl font-bold text-gray-900">Configuración</h1>
-        <p className="text-gray-500 mt-1">Integraciones y ajustes avanzados</p>
+        <h1 className="text-2xl font-bold text-brand-navy">Configuración</h1>
+        <p className="text-gray-400 mt-1">Integraciones y ajustes avanzados</p>
       </div>
 
       {searchParams.connected === 'google' && (
