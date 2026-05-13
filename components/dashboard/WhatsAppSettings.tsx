@@ -3,7 +3,7 @@ import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/Button'
 import { Input } from '@/components/ui/Input'
-import { MessageCircle, Save, Check, Info } from 'lucide-react'
+import { MessageCircle, Save, Check, Phone, ChevronDown, ChevronUp } from 'lucide-react'
 
 interface WAConfig {
   id?: string
@@ -16,9 +16,10 @@ interface WAConfig {
 interface WhatsAppSettingsProps {
   clinicId: string
   initialConfig: WAConfig | null
+  poolPhone?: string | null
 }
 
-export function WhatsAppSettings({ clinicId, initialConfig }: WhatsAppSettingsProps) {
+export function WhatsAppSettings({ clinicId, initialConfig, poolPhone }: WhatsAppSettingsProps) {
   const supabase = createClient()
   const [config, setConfig] = useState<WAConfig>(initialConfig ?? {
     twilio_account_sid: '',
@@ -28,12 +29,24 @@ export function WhatsAppSettings({ clinicId, initialConfig }: WhatsAppSettingsPr
   })
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [showAdvanced, setShowAdvanced] = useState(false)
+  const [requesting, setRequesting] = useState(false)
+  const [assignedPhone, setAssignedPhone] = useState<string | null>(poolPhone ?? null)
 
+  const isPoolNumber = !!assignedPhone
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
   const webhookUrl = `${appUrl}/api/whatsapp/webhook`
 
   function update(field: keyof WAConfig, value: string | boolean) {
     setConfig(prev => ({ ...prev, [field]: value }))
+  }
+
+  async function handleRequestNumber() {
+    setRequesting(true)
+    const res = await fetch('/api/phone-pool/assign', { method: 'POST' })
+    const data = await res.json()
+    if (data.phone) setAssignedPhone(data.phone)
+    setRequesting(false)
   }
 
   async function handleSave() {
@@ -61,97 +74,101 @@ export function WhatsAppSettings({ clinicId, initialConfig }: WhatsAppSettingsPr
 
   return (
     <div className="space-y-6">
-      {/* WhatsApp section */}
       <div className="bg-white rounded-2xl border border-gray-100 p-6">
         <div className="flex items-center gap-3 mb-6">
           <div className="w-10 h-10 bg-green-100 rounded-xl flex items-center justify-center">
             <MessageCircle size={20} className="text-green-600" />
           </div>
           <div>
-            <h2 className="font-semibold text-gray-900">Integración WhatsApp</h2>
-            <p className="text-sm text-gray-500">Conecta tu número de Twilio para responder mensajes automáticamente</p>
+            <h2 className="font-semibold text-gray-900">WhatsApp</h2>
+            <p className="text-sm text-gray-500">Número de WhatsApp asignado a tu clínica</p>
           </div>
         </div>
 
-        {/* Webhook URL info */}
-        <div className="bg-brand-50 border border-brand-100 rounded-xl p-4 mb-6">
-          <div className="flex items-start gap-2">
-            <Info size={16} className="text-brand-700 mt-0.5 flex-shrink-0" />
-            <div>
-              <p className="text-sm font-semibold text-brand-700 mb-1">Tu URL de Webhook para Twilio</p>
-              <p className="text-xs text-brand-600 mb-2">
-                En la consola de Twilio → WhatsApp → Sandbox → cuando reciba un mensaje, pon esta URL:
-              </p>
-              <code className="text-xs bg-white border border-brand-200 rounded-lg px-3 py-1.5 block font-mono text-brand-800 break-all">
-                {webhookUrl}
-              </code>
+        {isPoolNumber ? (
+          <div className="bg-green-50 border border-green-200 rounded-xl p-5 mb-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-green-100 rounded-xl flex items-center justify-center">
+                <Phone size={18} className="text-green-600" />
+              </div>
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-widest text-green-600 mb-0.5">Tu número de WhatsApp</p>
+                <p className="text-xl font-bold text-gray-900 font-mono">{assignedPhone}</p>
+              </div>
+              <span className="ml-auto text-xs bg-green-100 text-green-700 px-3 py-1 rounded-full font-semibold">Activo</span>
+            </div>
+            <p className="text-xs text-gray-500 mt-3">
+              Tus clientes pueden escribirte a este número en WhatsApp y Huella Bot responderá automáticamente.
+              Comparte este número en tu clínica, redes sociales y tarjetas de presentación.
+            </p>
+          </div>
+        ) : (
+          <div className="bg-gray-50 border border-gray-200 rounded-xl p-5 mb-4 text-center">
+            <Phone size={28} className="text-gray-300 mx-auto mb-3" />
+            <p className="text-sm text-gray-600 font-medium mb-1">Aún no tienes un número asignado</p>
+            <p className="text-xs text-gray-400 mb-4">
+              Solicita tu número de WhatsApp dedicado. Lo asignaremos automáticamente de nuestro pool.
+            </p>
+            <Button onClick={handleRequestNumber} loading={requesting} size="sm">
+              Solicitar número de WhatsApp
+            </Button>
+          </div>
+        )}
+
+        {/* Advanced: manual Twilio config */}
+        <button
+          onClick={() => setShowAdvanced(v => !v)}
+          className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-600 transition-colors mt-2"
+        >
+          {showAdvanced ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+          Configuración avanzada (número propio)
+        </button>
+
+        {showAdvanced && (
+          <div className="mt-4 pt-4 border-t border-gray-100 space-y-4">
+            <p className="text-xs text-gray-500">
+              Si prefieres usar tu propio número de Twilio, configúralo aquí.
+              Webhook URL: <code className="bg-gray-100 px-1.5 py-0.5 rounded text-xs font-mono break-all">{webhookUrl}</code>
+            </p>
+            <Input
+              label="Twilio Account SID"
+              value={config.twilio_account_sid}
+              placeholder="ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+              onChange={e => update('twilio_account_sid', e.target.value)}
+            />
+            <Input
+              label="Twilio Auth Token"
+              type="password"
+              value={config.twilio_auth_token}
+              placeholder="Tu auth token de Twilio"
+              onChange={e => update('twilio_auth_token', e.target.value)}
+            />
+            <Input
+              label="Número de WhatsApp (con código de país)"
+              value={config.twilio_phone_number}
+              placeholder="+14155238886"
+              onChange={e => update('twilio_phone_number', e.target.value)}
+            />
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => update('is_active', !config.is_active)}
+                className={`relative w-11 h-6 rounded-full transition-colors ${config.is_active ? 'bg-brand-teal' : 'bg-gray-200'}`}
+              >
+                <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${config.is_active ? 'translate-x-5' : ''}`} />
+              </button>
+              <span className="text-sm text-gray-700">
+                {config.is_active ? 'Activo' : 'Desactivado'}
+              </span>
+            </div>
+            <div className="flex items-center gap-3">
+              <Button onClick={handleSave} loading={saving} size="sm">
+                <Save size={14} className="mr-1.5" />
+                {saving ? 'Guardando...' : 'Guardar'}
+              </Button>
+              {saved && <span className="text-sm text-green-600 font-medium flex items-center gap-1"><Check size={14} /> Guardado</span>}
             </div>
           </div>
-        </div>
-
-        <div className="space-y-4">
-          <Input
-            label="Twilio Account SID"
-            value={config.twilio_account_sid}
-            placeholder="ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-            onChange={e => update('twilio_account_sid', e.target.value)}
-          />
-          <Input
-            label="Twilio Auth Token"
-            type="password"
-            value={config.twilio_auth_token}
-            placeholder="Tu auth token de Twilio"
-            onChange={e => update('twilio_auth_token', e.target.value)}
-          />
-          <Input
-            label="Número de WhatsApp de Twilio (con código de país)"
-            value={config.twilio_phone_number}
-            placeholder="+14155238886"
-            onChange={e => update('twilio_phone_number', e.target.value)}
-          />
-
-          <div className="flex items-center gap-3 pt-2">
-            <button
-              onClick={() => update('is_active', !config.is_active)}
-              className={`relative w-11 h-6 rounded-full transition-colors ${config.is_active ? 'bg-brand-600' : 'bg-gray-200'}`}
-            >
-              <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${config.is_active ? 'translate-x-5' : ''}`} />
-            </button>
-            <span className="text-sm text-gray-700">
-              {config.is_active ? 'WhatsApp activo' : 'WhatsApp desactivado'}
-            </span>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-3 mt-6">
-          <Button onClick={handleSave} loading={saving}>
-            <Save size={15} className="mr-2" />
-            {saving ? 'Guardando...' : 'Guardar configuración'}
-          </Button>
-          {saved && <span className="text-sm text-brand-600 font-medium flex items-center gap-1"><Check size={14} /> Guardado</span>}
-        </div>
-      </div>
-
-      {/* Setup guide */}
-      <div className="bg-white rounded-2xl border border-gray-100 p-6">
-        <h3 className="font-semibold text-gray-900 mb-4">Guía de configuración Twilio WhatsApp</h3>
-        <ol className="space-y-3 text-sm text-gray-600">
-          {[
-            { n: 1, t: 'Crea una cuenta en twilio.com (tienen prueba gratuita)' },
-            { n: 2, t: 'En la consola Twilio, ve a Messaging → Try it out → WhatsApp Sandbox' },
-            { n: 3, t: 'Sigue los pasos para activar el Sandbox (envía un mensaje al número de Twilio)' },
-            { n: 4, t: 'En "Sandbox Settings", pega la URL del webhook de arriba en "When a message comes in"' },
-            { n: 5, t: 'Copia tu Account SID y Auth Token desde la página principal de Twilio' },
-            { n: 6, t: 'Pega los datos aquí y guarda. ¡Listo para probar!' },
-          ].map(({ n, t }) => (
-            <li key={n} className="flex gap-3">
-              <span className="w-6 h-6 bg-brand-100 text-brand-700 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0">
-                {n}
-              </span>
-              <span>{t}</span>
-            </li>
-          ))}
-        </ol>
+        )}
       </div>
     </div>
   )

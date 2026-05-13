@@ -76,14 +76,15 @@ export async function POST(req: NextRequest) {
       return twimlResponse('No hay clínicas registradas en este sistema aún.')
     }
 
-    // ── Validar firma Twilio si hay config activa ────────────────────────────
+    // ── Validar firma Twilio ─────────────────────────────────────────────────
     const waConfig = configByNumber.data
-    if (process.env.NODE_ENV === 'production' && waConfig?.is_active && waConfig.twilio_auth_token) {
+    const authToken = waConfig?.twilio_auth_token || process.env.TWILIO_AUTH_TOKEN || ''
+    if (process.env.NODE_ENV === 'production' && authToken) {
       const signature = req.headers.get('x-twilio-signature') ?? ''
       const url       = process.env.NEXT_PUBLIC_APP_URL + '/api/whatsapp/webhook'
       const paramsObj: Record<string, string> = {}
       params.forEach((value, key) => { paramsObj[key] = value })
-      if (!twilio.validateRequest(waConfig.twilio_auth_token, signature, url, paramsObj)) {
+      if (!twilio.validateRequest(authToken, signature, url, paramsObj)) {
         return new NextResponse('Forbidden', { status: 403 })
       }
     }

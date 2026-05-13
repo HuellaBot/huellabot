@@ -27,6 +27,11 @@ export async function GET(request: NextRequest) {
 
         if (clinic) {
           await supabase.from('bot_configs').insert({ clinic_id: clinic.id })
+          // Auto-assign WhatsApp number from pool (best-effort)
+          try {
+            const { assignNumberToClinic } = await import('@/lib/phone-pool')
+            await assignNumberToClinic(clinic.id)
+          } catch { /* no pool numbers available yet */ }
         }
       }
 

@@ -55,6 +55,8 @@ export default function SignupPage() {
 
       if (clinic) {
         await supabase.from('bot_configs').insert({ clinic_id: clinic.id })
+        // Auto-assign WhatsApp number from pool
+        await fetch('/api/phone-pool/assign', { method: 'POST' })
       }
 
       window.location.href = '/dashboard'
