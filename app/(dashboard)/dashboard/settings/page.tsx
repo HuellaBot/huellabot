@@ -54,7 +54,7 @@ export default async function SettingsPage({ searchParams }: { searchParams: { c
           status={clinic.subscription_status ?? null}
           endsAt={clinic.subscription_ends_at ?? null}
         />
-        <CalendarConnect clinicId={clinic.id} isConnected={!!calToken} connectedAt={calToken?.created_at} />
+        <CalendarConnect clinicId={clinic.id} isConnected={!!calToken} connectedAt={calToken?.created_at} calendarId={calToken?.calendar_id ?? ''} />
         <WhatsAppSettings clinicId={clinic.id} initialConfig={waConfig} poolPhone={poolEntry?.phone_number ?? null} />
       </div>
     </div>
