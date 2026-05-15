@@ -55,37 +55,42 @@ export async function getAvailableSlots(
   clinicId: string,
   dateStr: string // YYYY-MM-DD
 ): Promise<string[]> {
-  const client = await getCalendarClient(clinicId)
-  if (!client) return generateDefaultSlots()
+  try {
+    const client = await getCalendarClient(clinicId)
+    if (!client) return generateDefaultSlots()
 
-  const { calendar, calendarId } = client
-  // Mexico City is UTC-6 permanently (abolished DST in 2023)
-  const dayStart = new Date(`${dateStr}T08:00:00-06:00`)
-  const dayEnd = new Date(`${dateStr}T18:00:00-06:00`)
+    const { calendar, calendarId } = client
+    // Mexico City is UTC-6 permanently (abolished DST in 2023)
+    const dayStart = new Date(`${dateStr}T08:00:00-06:00`)
+    const dayEnd = new Date(`${dateStr}T18:00:00-06:00`)
 
-  const { data } = await calendar.freebusy.query({
-    requestBody: {
-      timeMin: dayStart.toISOString(),
-      timeMax: dayEnd.toISOString(),
-      items: [{ id: calendarId }],
-    },
-  })
-
-  const busy = data.calendars?.[calendarId]?.busy ?? []
-  const allSlots = generateSlotsForDay(dayStart, dayEnd)
-
-  return allSlots.filter(slot => {
-    const slotStart = new Date(slot)
-    const slotEnd = new Date(slotStart.getTime() + 30 * 60 * 1000)
-    return !busy.some(b => {
-      const bStart = new Date(b.start!)
-      const bEnd = new Date(b.end!)
-      return slotStart < bEnd && slotEnd > bStart
+    const { data } = await calendar.freebusy.query({
+      requestBody: {
+        timeMin: dayStart.toISOString(),
+        timeMax: dayEnd.toISOString(),
+        items: [{ id: calendarId }],
+      },
     })
-  }).map(slot => {
-    const d = new Date(slot)
-    return d.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'America/Mexico_City' })
-  })
+
+    const busy = data.calendars?.[calendarId]?.busy ?? []
+    const allSlots = generateSlotsForDay(dayStart, dayEnd)
+
+    return allSlots.filter(slot => {
+      const slotStart = new Date(slot)
+      const slotEnd = new Date(slotStart.getTime() + 30 * 60 * 1000)
+      return !busy.some(b => {
+        const bStart = new Date(b.start!)
+        const bEnd = new Date(b.end!)
+        return slotStart < bEnd && slotEnd > bStart
+      })
+    }).map(slot => {
+      const d = new Date(slot)
+      return d.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit', hour12: true, timeZone: 'America/Mexico_City' })
+    })
+  } catch (err) {
+    console.error('[getAvailableSlots] calendar API error, using defaults:', err)
+    return generateDefaultSlots()
+  }
 }
 
 export async function createCalendarEvent(

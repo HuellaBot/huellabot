@@ -164,7 +164,8 @@ export async function POST(req: NextRequest) {
 
         if (block.name === 'book_appointment') {
           try {
-            const res  = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/appointments`, {
+            const appointmentUrl = `${process.env.NEXT_PUBLIC_APP_URL}/api/appointments`
+            const res = await fetch(appointmentUrl, {
               method:  'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
@@ -177,10 +178,12 @@ export async function POST(req: NextRequest) {
                 notes:         input.notes || '',
               }),
             })
+            if (!res.ok) throw new Error(`HTTP ${res.status}`)
             const data = await res.json()
             result = data.message || 'Cita agendada exitosamente.'
-          } catch {
-            result = 'No pude agendar la cita. Por favor llama directamente a la clínica.'
+          } catch (err) {
+            console.error('[book_appointment tool]', err)
+            result = 'No pude registrar la cita en este momento. Por favor llama directamente a la clínica.'
           }
         }
 
