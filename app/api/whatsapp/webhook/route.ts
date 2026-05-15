@@ -33,7 +33,7 @@ const bookingTools: Parameters<typeof anthropic.messages.create>[0]['tools'] = [
         service:          { type: 'string' },
         appointment_at:   { type: 'string', description: 'ISO 8601, ej: 2026-05-10T10:00:00' },
         phone:            { type: 'string' },
-        email:            { type: 'string', description: 'Correo del cliente para enviarle invitación de Google Calendar' },
+        email:            { type: 'string', description: 'Correo del cliente (para el registro de la cita).' },
         duration_minutes: { type: 'number', description: 'Duración del servicio en minutos. Consulta=30, Baño=90.' },
         notes:            { type: 'string' },
       },
