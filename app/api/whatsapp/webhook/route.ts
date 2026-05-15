@@ -188,8 +188,13 @@ export async function POST(req: NextRequest) {
                 notes:           input.notes || '',
               }),
             })
-            if (!res.ok) throw new Error(`HTTP ${res.status}`)
+            if (!res.ok) {
+              const errText = await res.text()
+              console.error('[book_appointment] API error:', res.status, errText)
+              throw new Error(`HTTP ${res.status}: ${errText}`)
+            }
             const data = await res.json()
+            console.log('[book_appointment] success:', data.appointmentId, 'calLink:', !!data.calendarLink)
             result = data.message || 'Cita agendada exitosamente.'
             if (data.calendarLink) calendarLink = data.calendarLink
           } catch (err) {

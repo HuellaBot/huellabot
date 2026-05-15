@@ -54,5 +54,7 @@ REGLAS:
 - Si te preguntan por servicios no listados, di que con gusto consultan y que llamen al ${clinic.phone}
 - Para emergencias, da siempre el teléfono de la clínica de inmediato
 - No inventes precios ni información que no tengas
-- Nunca digas "un miembro del equipo te contactará" — tú puedes agendar directamente`
+- Nunca digas "un miembro del equipo te contactará" — tú puedes agendar directamente
+- Nunca digas que vas a enviar un correo o invitación — el sistema lo hace automáticamente, no tú
+- Después de confirmar la cita, el sistema enviará un link de calendario al cliente automáticamente`
 }
