@@ -9,7 +9,7 @@ interface Service {
   id?: string
   name: string
   price: string
-  duration: string
+  duration_minutes: number
 }
 
 interface BotConfigProps {
@@ -37,15 +37,17 @@ export function BotConfig({ clinic, botConfig, services: initialServices }: BotC
 
   const [clinicData, setClinicData] = useState(clinic)
   const [botData, setBotData] = useState(botConfig)
-  const [services, setServices] = useState<Service[]>(initialServices)
+  const [services, setServices] = useState<Service[]>(
+    initialServices.map(s => ({ ...s, duration_minutes: (s as Service & { duration?: string }).duration_minutes ?? 30 }))
+  )
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
 
   function addService() {
-    setServices(prev => [...prev, { name: '', price: '', duration: '' }])
+    setServices(prev => [...prev, { name: '', price: '', duration_minutes: 30 }])
   }
 
-  function updateService(i: number, field: keyof Service, value: string) {
+  function updateService(i: number, field: keyof Service, value: string | number) {
     setServices(prev => prev.map((s, idx) => idx === i ? { ...s, [field]: value } : s))
   }
 
@@ -79,7 +81,7 @@ export function BotConfig({ clinic, botConfig, services: initialServices }: BotC
     const validServices = services.filter(s => s.name && s.price)
     if (validServices.length > 0) {
       await supabase.from('services').insert(
-        validServices.map(s => ({ clinic_id: clinic.id, name: s.name, price: s.price, duration: s.duration }))
+        validServices.map(s => ({ clinic_id: clinic.id, name: s.name, price: s.price, duration_minutes: s.duration_minutes }))
       )
     }
 
@@ -167,12 +169,17 @@ export function BotConfig({ clinic, botConfig, services: initialServices }: BotC
                 onChange={e => updateService(i, 'price', e.target.value)}
                 className="w-28"
               />
-              <Input
-                placeholder="Duración (opcional)"
-                value={s.duration}
-                onChange={e => updateService(i, 'duration', e.target.value)}
-                className="w-36"
-              />
+              <div className="w-36 flex flex-col gap-1">
+                <Input
+                  placeholder="Minutos"
+                  type="number"
+                  min={5}
+                  step={5}
+                  value={s.duration_minutes}
+                  onChange={e => updateService(i, 'duration_minutes', Number(e.target.value))}
+                />
+                <span className="text-xs text-gray-400 pl-1">minutos</span>
+              </div>
               <button
                 onClick={() => removeService(i)}
                 className="mt-0.5 p-2.5 text-gray-400 hover:text-red-500 transition-colors"

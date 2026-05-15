@@ -16,7 +16,18 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Faltan campos requeridos' }, { status: 400 })
     }
 
-    const duration = Number(durationMinutes) || 30
+    // Look up duration_minutes from services table — source of truth
+    let duration = 30
+    if (service) {
+      const { data: svc } = await supabase
+        .from('services')
+        .select('duration_minutes')
+        .eq('clinic_id', clinicId)
+        .ilike('name', `%${service.split(' ')[0]}%`)
+        .maybeSingle()
+      if (svc?.duration_minutes) duration = svc.duration_minutes
+    }
+    if (duration === 30 && durationMinutes) duration = Number(durationMinutes)
 
     const hasTimezone = /Z$|[+-]\d{2}:?\d{2}$/.test(appointmentAt)
     const appointmentDate = new Date(hasTimezone ? appointmentAt : `${appointmentAt}-06:00`)

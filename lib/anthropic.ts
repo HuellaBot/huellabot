@@ -7,7 +7,7 @@ export const anthropic = new Anthropic({
 export function buildSystemPrompt(clinic: {
   name: string
   description: string
-  services: Array<{ name: string; price: string; duration?: string }>
+  services: Array<{ name: string; price: string; duration_minutes?: number }>
   hours: string
   phone: string
   address: string
@@ -16,7 +16,7 @@ export function buildSystemPrompt(clinic: {
   extra_info: string
 }): string {
   const servicesList = clinic.services
-    .map(s => `- ${s.name}: $${s.price}${s.duration ? ` (${s.duration})` : ''}`)
+    .map(s => `- ${s.name}: $${s.price} (${s.duration_minutes ?? 30} minutos)`)
     .join('\n')
 
   return `Eres ${clinic.bot_name}, el asistente virtual de ${clinic.name}.
