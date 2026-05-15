@@ -159,9 +159,12 @@ export async function POST(req: NextRequest) {
         if (block.name === 'check_availability') {
           const duration = Number(input.duration_minutes) || 30
           const slots = await getAvailableSlots(clinicId, input.date, duration)
+          const dayName = new Date(`${input.date}T12:00:00-06:00`).toLocaleDateString('es-MX', {
+            weekday: 'long', day: 'numeric', month: 'long', timeZone: 'America/Mexico_City',
+          })
           result = slots.length > 0
-            ? `Horarios disponibles el ${input.date} (servicio de ${duration} min): ${slots.join(', ')}`
-            : `No hay horarios disponibles el ${input.date}. Sugiere otra fecha.`
+            ? `El ${input.date} es ${dayName}. Horarios disponibles (servicio de ${duration} min): ${slots.join(', ')}`
+            : `El ${input.date} es ${dayName}. No hay horarios disponibles. Sugiere otra fecha.`
         }
 
         if (block.name === 'book_appointment') {
