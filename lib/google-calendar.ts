@@ -181,7 +181,7 @@ export async function deleteCalendarEvent(clinicId: string, eventId: string): Pr
     const client = await getCalendarClient(clinicId)
     if (!client) return
     const { calendar, calendarId } = client
-    await calendar.events.delete({ calendarId, eventId, sendUpdates: 'all' })
+    await calendar.events.delete({ calendarId, eventId, sendUpdates: 'none' })
   } catch (err) {
     console.error('[deleteCalendarEvent] error:', err)
     throw err

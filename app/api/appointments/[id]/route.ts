@@ -34,6 +34,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
         await client.calendar.events.delete({
           calendarId: client.calendarId,
           eventId: appointment.google_event_id,
+          sendUpdates: 'none',
         })
       }
     } catch (err) {
