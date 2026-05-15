@@ -19,18 +19,20 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Faltan campos requeridos' }, { status: 400 })
     }
 
-    // Look up duration_minutes from services table — source of truth
-    let duration = 30
-    if (service) {
+    // Determine duration: bot-provided first (bot reads system prompt with real durations),
+    // then DB lookup as fallback
+    let duration = Number(durationMinutes) || 0
+    if (!duration && service) {
       const { data: svc } = await supabase
         .from('services')
         .select('duration_minutes')
         .eq('clinic_id', clinicId)
-        .ilike('name', `%${service.split(' ')[0]}%`)
+        .ilike('name', `%${service}%`)
         .maybeSingle()
       if (svc?.duration_minutes) duration = svc.duration_minutes
     }
-    if (duration === 30 && durationMinutes) duration = Number(durationMinutes)
+    if (!duration) duration = 30
+    console.log('[appointments] duration resolved:', duration, 'from bot:', durationMinutes)
 
     const hasTimezone = /Z$|[+-]\d{2}:?\d{2}$/.test(appointmentAt)
     const appointmentDate = new Date(hasTimezone ? appointmentAt : `${appointmentAt}-06:00`)
@@ -66,7 +68,11 @@ export async function POST(req: NextRequest) {
         notes, phone, email: email || '', durationMinutes: duration,
       })
       if (googleEventId) {
-        await supabase.from('appointments').update({ google_event_id: googleEventId }).eq('id', appointment.id)
+        const { error: updateErr } = await supabase
+          .from('appointments').update({ google_event_id: googleEventId }).eq('id', appointment.id)
+        console.log('[appointments] google_event_id saved:', googleEventId, 'err:', updateErr?.message)
+      } else {
+        console.warn('[appointments] no googleEventId returned — event not linked')
       }
     } catch (calErr) {
       console.warn('[appointments] Google Calendar event failed (non-critical):', calErr)

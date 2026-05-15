@@ -17,7 +17,7 @@ const bookingTools: Parameters<typeof anthropic.messages.create>[0]['tools'] = [
       type: 'object' as const,
       properties: {
         date:             { type: 'string', description: 'Fecha en formato YYYY-MM-DD.' },
-        duration_minutes: { type: 'number', description: 'Duración del servicio en minutos. Consulta=30, Baño=90. Si no sabes, usa 30.' },
+        duration_minutes: { type: 'number', description: 'Duración del servicio en minutos según la lista de servicios de la clínica.' },
       },
       required: ['date'],
     },
@@ -34,7 +34,7 @@ const bookingTools: Parameters<typeof anthropic.messages.create>[0]['tools'] = [
         appointment_at:   { type: 'string', description: 'ISO 8601, ej: 2026-05-10T10:00:00' },
         phone:            { type: 'string' },
         email:            { type: 'string', description: 'Correo del cliente (para el registro de la cita).' },
-        duration_minutes: { type: 'number', description: 'Duración del servicio en minutos. Consulta=30, Baño=90.' },
+        duration_minutes: { type: 'number', description: 'Duración del servicio en minutos según la lista de servicios de la clínica.' },
         notes:            { type: 'string' },
       },
       required: ['patient_name', 'pet_name', 'service', 'appointment_at'],
