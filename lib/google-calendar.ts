@@ -78,10 +78,16 @@ export async function getCalendarClient(clinicId: string) {
   return { calendar: google.calendar({ version: 'v3', auth: oauth2Client }), calendarId }
 }
 
-export async function getAvailableSlots(clinicId: string, dateStr: string): Promise<string[]> {
+const BUFFER_MINUTES = 15 // tiempo entre citas
+
+export async function getAvailableSlots(
+  clinicId: string,
+  dateStr: string,
+  durationMinutes = 30
+): Promise<string[]> {
   try {
     const client = await getCalendarClient(clinicId)
-    if (!client) return generateDefaultSlots()
+    if (!client) return generateDefaultSlots(durationMinutes)
 
     const { calendar, calendarId } = client
     const dayStart = new Date(`${dateStr}T08:00:00-06:00`)
@@ -96,15 +102,21 @@ export async function getAvailableSlots(clinicId: string, dateStr: string): Prom
     })
 
     const busy = data.calendars?.[calendarId]?.busy ?? []
-    const allSlots = generateSlotsForDay(dayStart, dayEnd)
 
-    return allSlots.filter(slot => {
+    // Generate candidate start times every 30 min
+    const candidates = generateSlotsForDay(dayStart, dayEnd)
+
+    return candidates.filter(slot => {
       const slotStart = new Date(slot)
-      const slotEnd   = new Date(slotStart.getTime() + 30 * 60 * 1000)
+      const slotEnd   = new Date(slotStart.getTime() + durationMinutes * 60 * 1000)
+      // Don't offer slots that would run past end of day
+      if (slotEnd > dayEnd) return false
+      // Check no busy period overlaps with slot + buffer
+      const slotEndWithBuffer = new Date(slotEnd.getTime() + BUFFER_MINUTES * 60 * 1000)
       return !busy.some(b => {
         const bStart = new Date(b.start!)
         const bEnd   = new Date(b.end!)
-        return slotStart < bEnd && slotEnd > bStart
+        return slotStart < bEnd && slotEndWithBuffer > bStart
       })
     }).map(slot =>
       new Date(slot).toLocaleTimeString('es-MX', {
@@ -113,7 +125,7 @@ export async function getAvailableSlots(clinicId: string, dateStr: string): Prom
     )
   } catch (err) {
     console.error('[getAvailableSlots] error:', err)
-    return generateDefaultSlots()
+    return generateDefaultSlots(durationMinutes)
   }
 }
 
@@ -162,9 +174,14 @@ function generateSlotsForDay(start: Date, end: Date): string[] {
   return slots
 }
 
-function generateDefaultSlots(): string[] {
-  return ['9:00 AM', '9:30 AM', '10:00 AM', '10:30 AM', '11:00 AM', '11:30 AM',
-          '12:00 PM', '3:00 PM', '3:30 PM', '4:00 PM', '4:30 PM', '5:00 PM']
+function generateDefaultSlots(durationMinutes = 30): string[] {
+  // Default slots spaced by duration + buffer
+  const step = durationMinutes + BUFFER_MINUTES
+  const base  = ['9:00 AM', '9:30 AM', '10:00 AM', '10:30 AM', '11:00 AM', '11:30 AM',
+                  '12:00 PM', '3:00 PM', '3:30 PM', '4:00 PM', '4:30 PM', '5:00 PM']
+  if (step <= 30) return base
+  // For longer services return fewer slots
+  return ['9:00 AM', '11:00 AM', '1:00 PM', '3:00 PM']
 }
 
 export async function syncCalendarEvents(clinicId: string) {

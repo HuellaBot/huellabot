@@ -12,11 +12,12 @@ const supabase = createClient(
 const bookingTools: Parameters<typeof anthropic.messages.create>[0]['tools'] = [
   {
     name: 'check_availability',
-    description: 'Consulta los horarios disponibles para una fecha específica.',
+    description: 'Consulta los horarios disponibles para una fecha y servicio específico.',
     input_schema: {
       type: 'object' as const,
       properties: {
-        date: { type: 'string', description: 'Fecha en formato YYYY-MM-DD.' },
+        date:             { type: 'string', description: 'Fecha en formato YYYY-MM-DD.' },
+        duration_minutes: { type: 'number', description: 'Duración del servicio en minutos. Consulta=30, Baño=90. Si no sabes, usa 30.' },
       },
       required: ['date'],
     },
@@ -156,9 +157,10 @@ export async function POST(req: NextRequest) {
         let result  = ''
 
         if (block.name === 'check_availability') {
-          const slots = await getAvailableSlots(clinicId, input.date)
+          const duration = Number(input.duration_minutes) || 30
+          const slots = await getAvailableSlots(clinicId, input.date, duration)
           result = slots.length > 0
-            ? `Horarios disponibles el ${input.date}: ${slots.join(', ')}`
+            ? `Horarios disponibles el ${input.date} (servicio de ${duration} min): ${slots.join(', ')}`
             : `No hay horarios disponibles el ${input.date}. Sugiere otra fecha.`
         }
 
