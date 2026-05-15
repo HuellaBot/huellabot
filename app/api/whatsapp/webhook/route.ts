@@ -203,6 +203,7 @@ export async function POST(req: NextRequest) {
         }
 
         if (block.name === 'book_appointment') {
+          console.log('[webhook] calling book_appointment with:', JSON.stringify(block.input))
           try {
             const appointmentUrl = `${process.env.NEXT_PUBLIC_APP_URL}/api/appointments`
             const res = await fetch(appointmentUrl, {
@@ -245,6 +246,7 @@ export async function POST(req: NextRequest) {
       ]
     }
 
+    console.log('[webhook] loop done — finalReply:', !!finalReply, 'calendarLink:', !!calendarLink)
     if (!finalReply) finalReply = 'No pude procesar tu mensaje. Por favor intenta de nuevo.'
     if (calendarLink) finalReply += `\n\n📅 Agrega al calendario: ${calendarLink}`
 
