@@ -32,7 +32,14 @@ export async function POST(req: NextRequest) {
     const calendar = google.calendar({ version: 'v3', auth: client as Parameters<typeof google.calendar>[0]['auth'] })
 
     // Try to read calendar — will fail if not shared with service account
-    await calendar.calendarList.get({ calendarId })
+    const now = new Date().toISOString()
+    await calendar.freebusy.query({
+      requestBody: {
+        timeMin: now,
+        timeMax: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+        items: [{ id: calendarId }],
+      },
+    })
   } catch {
     return NextResponse.json(
       { error: 'No tenemos acceso a ese calendario. Asegúrate de haberlo compartido con huellabot-calendar@huella-bot.iam.gserviceaccount.com con permiso de edición.' },
