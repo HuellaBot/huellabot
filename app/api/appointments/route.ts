@@ -12,7 +12,10 @@ export async function POST(req: NextRequest) {
     const body = await req.json()
     const { clinicId, patientName, petName, service, appointmentAt, phone, email, durationMinutes, notes } = body
 
+    console.log('[appointments] incoming:', { clinicId, patientName, petName, service, appointmentAt, phone, email, durationMinutes })
+
     if (!clinicId || !patientName || !appointmentAt) {
+      console.log('[appointments] missing required fields')
       return NextResponse.json({ error: 'Faltan campos requeridos' }, { status: 400 })
     }
 
@@ -50,8 +53,10 @@ export async function POST(req: NextRequest) {
       .single()
 
     if (error || !appointment) {
+      console.error('[appointments] insert error:', error)
       return NextResponse.json({ error: 'Error al guardar la cita' }, { status: 500 })
     }
+    console.log('[appointments] inserted id:', appointment.id, 'clinic:', clinicId)
 
     // Create Google Calendar event with correct duration and client invitation
     let googleEventId: string | null = null
