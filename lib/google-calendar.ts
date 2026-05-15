@@ -138,6 +138,8 @@ export async function createCalendarEvent(
     appointmentAt: Date
     notes?: string
     phone?: string
+    email?: string
+    durationMinutes?: number
   }
 ): Promise<string | null> {
   try {
@@ -145,15 +147,29 @@ export async function createCalendarEvent(
     if (!client) return null
 
     const { calendar, calendarId } = client
-    const endTime = new Date(appointment.appointmentAt.getTime() + 30 * 60 * 1000)
+    const duration = appointment.durationMinutes ?? 30
+    const endTime  = new Date(appointment.appointmentAt.getTime() + duration * 60 * 1000)
+
+    const attendees = appointment.email
+      ? [{ email: appointment.email, displayName: appointment.patientName }]
+      : []
 
     const { data } = await calendar.events.insert({
       calendarId,
+      sendUpdates: attendees.length > 0 ? 'all' : 'none',
       requestBody: {
         summary: `🐾 ${appointment.petName} — ${appointment.service}`,
-        description: `Paciente: ${appointment.patientName}\nMascota: ${appointment.petName}\nServicio: ${appointment.service}\nTeléfono: ${appointment.phone || 'No proporcionado'}${appointment.notes ? `\n\nNotas: ${appointment.notes}` : ''}`,
+        description: [
+          `Paciente: ${appointment.patientName}`,
+          `Mascota: ${appointment.petName}`,
+          `Servicio: ${appointment.service} (${duration} min)`,
+          `Teléfono: ${appointment.phone || 'No proporcionado'}`,
+          appointment.email ? `Email: ${appointment.email}` : '',
+          appointment.notes ? `\nNotas: ${appointment.notes}` : '',
+        ].filter(Boolean).join('\n'),
         start: { dateTime: appointment.appointmentAt.toISOString(), timeZone: 'America/Mexico_City' },
         end:   { dateTime: endTime.toISOString(), timeZone: 'America/Mexico_City' },
+        attendees,
       },
     })
 
