@@ -74,11 +74,20 @@ export async function POST(req: NextRequest) {
       hour: '2-digit', minute: '2-digit', timeZone: 'America/Mexico_City',
     })
 
+    // Google Calendar "add to my calendar" link for the client
+    const fmt = (d: Date) => d.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '')
+    const endDate = new Date(appointmentDate.getTime() + duration * 60 * 1000)
+    const calLink = `https://calendar.google.com/calendar/render?action=TEMPLATE` +
+      `&text=${encodeURIComponent(`🐾 ${petName} — ${service}`)}` +
+      `&dates=${fmt(appointmentDate)}/${fmt(endDate)}` +
+      `&details=${encodeURIComponent(`Clínica: ${patientName}\nMascota: ${petName}\nServicio: ${service}`)}`
+
     return NextResponse.json({
       success: true,
       appointmentId: appointment.id,
       googleEventId,
-      message: `Cita confirmada para ${patientName} el ${dateStr} a las ${timeStr} (${duration} min).${email ? ' Se envió invitación a ' + email + '.' : ''}`,
+      calendarLink: calLink,
+      message: `Cita confirmada para ${patientName} el ${dateStr} a las ${timeStr} (${duration} min). Agrega la cita a tu calendario: ${calLink}`,
     })
   } catch (err) {
     console.error('[appointments/route]', err)
