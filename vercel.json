@@ -3,5 +3,11 @@
   "buildCommand": "next build",
   "devCommand": "next dev",
   "installCommand": "npm install --legacy-peer-deps",
-  "regions": ["iad1"]
+  "regions": ["iad1"],
+  "crons": [
+    {
+      "path": "/api/cron/refresh-calendar-tokens",
+      "schedule": "0 6 * * *"
+    }
+  ]
 }
