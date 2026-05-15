@@ -104,7 +104,7 @@ export async function POST(req: NextRequest) {
       supabase.from('bot_configs').select('*').eq('clinic_id', clinicId).maybeSingle(),
       supabase.from('whatsapp_messages').select('message, response')
         .eq('clinic_id', clinicId).eq('phone_number', senderNumber)
-        .order('timestamp', { ascending: false }).limit(6),
+        .order('timestamp', { ascending: false }).limit(12),
     ])
 
     if (!clinic) return twimlResponse('Error al cargar la información de la clínica.')
@@ -132,11 +132,12 @@ export async function POST(req: NextRequest) {
       { role: 'user' as const, content: messageBody },
     ]
     let finalReply = ''
+    let calendarLink = ''
 
     for (let i = 0; i < 2; i++) {
       const response = await anthropic.messages.create({
         model:      'claude-haiku-4-5-20251001',
-        max_tokens: 400,
+        max_tokens: 700,
         system:     systemPrompt,
         tools:      bookingTools,
         messages:   currentMessages,
@@ -190,6 +191,7 @@ export async function POST(req: NextRequest) {
             if (!res.ok) throw new Error(`HTTP ${res.status}`)
             const data = await res.json()
             result = data.message || 'Cita agendada exitosamente.'
+            if (data.calendarLink) calendarLink = data.calendarLink
           } catch (err) {
             console.error('[book_appointment tool]', err)
             result = 'No pude registrar la cita en este momento. Por favor llama directamente a la clínica.'
@@ -207,6 +209,7 @@ export async function POST(req: NextRequest) {
     }
 
     if (!finalReply) finalReply = 'No pude procesar tu mensaje. Por favor intenta de nuevo.'
+    if (calendarLink) finalReply += `\n\n📅 Agrega al calendario: ${calendarLink}`
 
     // Guardar en background (no bloqueante)
     supabase.from('whatsapp_messages').insert({

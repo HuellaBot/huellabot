@@ -87,7 +87,8 @@ export async function POST(req: NextRequest) {
       appointmentId: appointment.id,
       googleEventId,
       calendarLink: calLink,
-      message: `Cita confirmada para ${patientName} el ${dateStr} a las ${timeStr} (${duration} min). Agrega la cita a tu calendario: ${calLink}`,
+      message: `Cita confirmada ✓ — ${patientName}, ${petName}, ${service}. ${dateStr} a las ${timeStr} (${duration} min).`,
+      calendarMessage: `Agrega la cita a tu Google Calendar: ${calLink}`,
     })
   } catch (err) {
     console.error('[appointments/route]', err)
