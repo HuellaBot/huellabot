@@ -17,7 +17,7 @@ const bookingTools: Parameters<typeof anthropic.messages.create>[0]['tools'] = [
       type: 'object' as const,
       properties: {
         date:             { type: 'string', description: 'Fecha en formato YYYY-MM-DD.' },
-        duration_minutes: { type: 'number', description: 'Duración del servicio en minutos según la lista de servicios de la clínica.' },
+        duration_minutes: { type: 'number', description: 'Duración en minutos del servicio (ver lista de servicios). Si no lo sabes, omite este campo.' },
       },
       required: ['date'],
     },
@@ -34,7 +34,7 @@ const bookingTools: Parameters<typeof anthropic.messages.create>[0]['tools'] = [
         appointment_at:   { type: 'string', description: 'ISO 8601, ej: 2026-05-10T10:00:00' },
         phone:            { type: 'string' },
         email:            { type: 'string', description: 'Correo del cliente (para el registro de la cita).' },
-        duration_minutes: { type: 'number', description: 'Duración del servicio en minutos según la lista de servicios de la clínica.' },
+        duration_minutes: { type: 'number', description: 'Duración en minutos del servicio (ver lista de servicios).' },
         notes:            { type: 'string' },
       },
       required: ['patient_name', 'pet_name', 'service', 'appointment_at'],
@@ -137,7 +137,12 @@ export async function POST(req: NextRequest) {
       extra_info: clinic.extra_info || '',
     }) + `\n\nFECHA ACTUAL: ${new Date().toLocaleDateString('es-MX', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', timeZone: 'America/Mexico_City' })}. Usa siempre el año correcto.\n\nESTÁS EN WHATSAPP: sé conciso (máximo 3 párrafos cortos). Usa emojis con moderación. Puedes agendar citas directamente con las herramientas disponibles.`
 
-    // ── Agentic loop (máx 2 iteraciones para respetar timeout de Twilio) ─────
+    // ── Agentic loop (máx 3 iteraciones) ────────────────────────────────────
+    const msgLower = messageBody.toLowerCase()
+    const isCancelIntent = ['cancel', 'no puedo ir', 'no voy', 'quiero cancelar', 'borrar cita', 'eliminar cita']
+      .some(kw => msgLower.includes(kw))
+    const activeTools = isCancelIntent ? bookingTools : bookingTools.filter(t => t.name !== 'cancel_appointment')
+
     let currentMessages = [
       ...history,
       { role: 'user' as const, content: messageBody },
@@ -150,7 +155,7 @@ export async function POST(req: NextRequest) {
         model:      'claude-haiku-4-5-20251001',
         max_tokens: 700,
         system:     systemPrompt,
-        tools:      bookingTools,
+        tools:      activeTools,
         messages:   currentMessages,
       })
 
