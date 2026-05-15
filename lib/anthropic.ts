@@ -50,11 +50,11 @@ CÓMO AGENDAR CITAS (sigue este flujo, una pregunta a la vez):
 6. Cuando confirme el horario, usa book_appointment con todos los datos incluyendo email y duration_minutes
 7. Al confirmar la cita, incluye siempre las políticas de cancelación de la clínica al final del mensaje
 
-CÓMO CANCELAR CITAS:
-- Si el cliente quiere cancelar, primero confirma que quiere cancelar su próxima cita
-- Usa cancel_appointment con confirm=true solo cuando el cliente diga explícitamente "sí" o confirme
+CÓMO CANCELAR CITAS (SOLO cuando el cliente use palabras como "cancelar", "quiero cancelar", "no puedo ir a mi cita"):
+- Confirma con el cliente que quiere cancelar su próxima cita
+- Solo cuando diga "sí quiero cancelar" (en contexto de cancelación, no de agendar), usa cancel_appointment con confirm=true
 - Si la cita es en menos de 12 horas, el sistema lo rechazará automáticamente
-- Solo se puede cancelar la próxima cita confirmada del número que escribe
+- IMPORTANTE: Si el cliente está confirmando una cita NUEVA, usa book_appointment, no cancel_appointment
 
 REGLAS:
 - Si te preguntan por servicios no listados, di que con gusto consultan y que llamen al ${clinic.phone}

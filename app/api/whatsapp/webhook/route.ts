@@ -42,11 +42,11 @@ const bookingTools: Parameters<typeof anthropic.messages.create>[0]['tools'] = [
   },
   {
     name: 'cancel_appointment',
-    description: 'Cancela la próxima cita confirmada del cliente. Solo se puede cancelar con al menos 12 horas de anticipación.',
+    description: 'Cancela la próxima cita confirmada del cliente. SOLO usar cuando el cliente haya dicho explícitamente que quiere CANCELAR su cita (palabras como "cancelar", "quiero cancelar", "no puedo ir"). NUNCA usar durante el flujo de agendado de una cita nueva.',
     input_schema: {
       type: 'object' as const,
       properties: {
-        confirm: { type: 'boolean', description: 'El cliente confirmó explícitamente que quiere cancelar.' },
+        confirm: { type: 'boolean', description: 'true si el cliente ya confirmó que quiere cancelar su cita existente.' },
       },
       required: ['confirm'],
     },
