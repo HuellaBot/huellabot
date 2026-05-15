@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
   const { calendarId } = await req.json()
   if (!calendarId) return NextResponse.json({ error: 'calendarId requerido' }, { status: 400 })
 
-  // Verify service account can access the calendar
+  // Verify service account has WRITE access by creating and deleting a test event
   try {
     const keyBase64 = process.env.GOOGLE_SERVICE_ACCOUNT_KEY!
     const key = JSON.parse(Buffer.from(keyBase64, 'base64').toString())
@@ -31,18 +31,31 @@ export async function POST(req: NextRequest) {
     const client = await auth.getClient()
     const calendar = google.calendar({ version: 'v3', auth: client as Parameters<typeof google.calendar>[0]['auth'] })
 
-    // Try to read calendar — will fail if not shared with service account
-    const now = new Date().toISOString()
-    await calendar.freebusy.query({
+    const testStart = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000) // 1 year from now
+    const testEnd   = new Date(testStart.getTime() + 60 * 1000)
+
+    const { data: testEvent } = await calendar.events.insert({
+      calendarId,
+      sendUpdates: 'none',
       requestBody: {
-        timeMin: now,
-        timeMax: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
-        items: [{ id: calendarId }],
+        summary: '[Huella Bot] Verificación de acceso — puedes eliminar este evento',
+        start: { dateTime: testStart.toISOString() },
+        end:   { dateTime: testEnd.toISOString() },
       },
     })
-  } catch {
+
+    // Clean up test event immediately
+    if (testEvent.id) {
+      await calendar.events.delete({ calendarId, eventId: testEvent.id, sendUpdates: 'none' }).catch(() => {})
+    }
+  } catch (err: unknown) {
+    const gErr = err as { code?: number; message?: string }
+    console.error('[calendar/connect] write test failed:', gErr?.code, gErr?.message)
+    const hint = gErr?.code === 403
+      ? 'Asegúrate de compartir el calendario con permiso "Hacer cambios en los eventos" (no solo lectura).'
+      : 'No se pudo verificar el acceso.'
     return NextResponse.json(
-      { error: 'No tenemos acceso a ese calendario. Asegúrate de haberlo compartido con huellabot-calendar@huella-bot.iam.gserviceaccount.com con permiso de edición.' },
+      { error: `No tenemos acceso de escritura a ese calendario. ${hint}` },
       { status: 403 }
     )
   }

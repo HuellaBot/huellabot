@@ -40,6 +40,17 @@ const bookingTools: Parameters<typeof anthropic.messages.create>[0]['tools'] = [
       required: ['patient_name', 'pet_name', 'service', 'appointment_at'],
     },
   },
+  {
+    name: 'cancel_appointment',
+    description: 'Cancela la próxima cita confirmada del cliente. Solo se puede cancelar con al menos 12 horas de anticipación.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        confirm: { type: 'boolean', description: 'El cliente confirmó explícitamente que quiere cancelar.' },
+      },
+      required: ['confirm'],
+    },
+  },
 ]
 
 export async function POST(req: NextRequest) {
@@ -134,7 +145,7 @@ export async function POST(req: NextRequest) {
     let finalReply = ''
     let calendarLink = ''
 
-    for (let i = 0; i < 2; i++) {
+    for (let i = 0; i < 3; i++) {
       const response = await anthropic.messages.create({
         model:      'claude-haiku-4-5-20251001',
         max_tokens: 700,
@@ -168,6 +179,27 @@ export async function POST(req: NextRequest) {
           result = slots.length > 0
             ? `El ${input.date} es ${dayName}. Horarios disponibles (servicio de ${duration} min): ${slots.join(', ')}`
             : `El ${input.date} es ${dayName}. No hay horarios disponibles. Sugiere otra fecha.`
+        }
+
+        if (block.name === 'cancel_appointment') {
+          const confirmed = (block.input as Record<string, unknown>).confirm === true
+          if (!confirmed) {
+            result = 'El cliente no confirmó la cancelación. Pregúntale si está seguro.'
+          } else {
+            try {
+              const cancelUrl = `${process.env.NEXT_PUBLIC_APP_URL}/api/appointments/cancel`
+              const res = await fetch(cancelUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ phone: senderNumber, clinicId }),
+              })
+              const data = await res.json()
+              result = data.message || (res.ok ? 'Cita cancelada exitosamente.' : 'No se pudo cancelar la cita.')
+            } catch (err) {
+              console.error('[cancel_appointment tool]', err)
+              result = 'No pude cancelar la cita en este momento. Por favor llama directamente a la clínica.'
+            }
+          }
         }
 
         if (block.name === 'book_appointment') {

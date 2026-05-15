@@ -150,13 +150,9 @@ export async function createCalendarEvent(
     const duration = appointment.durationMinutes ?? 30
     const endTime  = new Date(appointment.appointmentAt.getTime() + duration * 60 * 1000)
 
-    const attendees = appointment.email
-      ? [{ email: appointment.email, displayName: appointment.patientName }]
-      : []
-
     const { data } = await calendar.events.insert({
       calendarId,
-      sendUpdates: attendees.length > 0 ? 'all' : 'none',
+      sendUpdates: 'none',
       requestBody: {
         summary: `🐾 ${appointment.petName} — ${appointment.service}`,
         description: [
@@ -169,14 +165,26 @@ export async function createCalendarEvent(
         ].filter(Boolean).join('\n'),
         start: { dateTime: appointment.appointmentAt.toISOString(), timeZone: 'America/Mexico_City' },
         end:   { dateTime: endTime.toISOString(), timeZone: 'America/Mexico_City' },
-        attendees,
       },
     })
 
     return data.id ?? null
-  } catch (err) {
-    console.error('[createCalendarEvent] error:', err)
+  } catch (err: unknown) {
+    const gErr = err as { code?: number; message?: string; errors?: unknown[] }
+    console.error('[createCalendarEvent] error code:', gErr?.code, 'message:', gErr?.message, 'errors:', JSON.stringify(gErr?.errors))
     return null
+  }
+}
+
+export async function deleteCalendarEvent(clinicId: string, eventId: string): Promise<void> {
+  try {
+    const client = await getCalendarClient(clinicId)
+    if (!client) return
+    const { calendar, calendarId } = client
+    await calendar.events.delete({ calendarId, eventId, sendUpdates: 'all' })
+  } catch (err) {
+    console.error('[deleteCalendarEvent] error:', err)
+    throw err
   }
 }
 
