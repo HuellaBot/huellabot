@@ -141,7 +141,7 @@ export async function POST(req: NextRequest) {
     const msgLower = messageBody.toLowerCase()
     const isCancelIntent = ['cancel', 'no puedo ir', 'no voy', 'quiero cancelar', 'borrar cita', 'eliminar cita']
       .some(kw => msgLower.includes(kw))
-    const activeTools = isCancelIntent ? bookingTools : bookingTools.filter(t => t.name !== 'cancel_appointment')
+    const activeTools = isCancelIntent ? bookingTools : bookingTools!.filter(t => t.name !== 'cancel_appointment')
 
     let currentMessages = [
       ...history,
