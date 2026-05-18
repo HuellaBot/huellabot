@@ -139,7 +139,7 @@ export async function POST(req: NextRequest) {
 
     // ── Agentic loop (máx 3 iteraciones) ────────────────────────────────────
     const msgLower = messageBody.toLowerCase()
-    const isCancelIntent = ['cancel', 'no puedo ir', 'no voy', 'quiero cancelar', 'borrar cita', 'eliminar cita']
+    const isCancelIntent = ['cancel', 'reagend', 'no puedo ir', 'no voy', 'quiero cancelar', 'borrar cita', 'eliminar cita', 'cambiar cita', 'cambiar mi cita', 'mover cita']
       .some(kw => msgLower.includes(kw))
     const activeTools = isCancelIntent ? bookingTools : bookingTools!.filter(t => t.name !== 'cancel_appointment')
 
@@ -227,7 +227,7 @@ export async function POST(req: NextRequest) {
                 petName:         input.pet_name,
                 service:         input.service,
                 appointmentAt:   input.appointment_at,
-                phone:           input.phone || senderNumber,
+                phone:           senderNumber,
                 email:           input.email || '',
                 durationMinutes: Number(input.duration_minutes) || 30,
                 notes:           input.notes || '',
