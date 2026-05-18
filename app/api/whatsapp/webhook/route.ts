@@ -149,25 +149,32 @@ export async function POST(req: NextRequest) {
     ]
     let finalReply = ''
     let calendarLink = ''
+    let bookingConfirmation = ''
+
+    console.log('[webhook] history msgs:', history.length, 'tools:', activeTools?.map(t => t.name).join(','))
 
     for (let i = 0; i < 3; i++) {
       const response = await anthropic.messages.create({
         model:      'claude-haiku-4-5-20251001',
-        max_tokens: 700,
+        max_tokens: 1024,
         system:     systemPrompt,
         tools:      activeTools,
         messages:   currentMessages,
       })
+
+      console.log(`[webhook] iter ${i} stop_reason:`, response.stop_reason)
 
       if (response.stop_reason !== 'tool_use') {
         finalReply = response.content
           .filter(b => b.type === 'text')
           .map(b => (b as { type: 'text'; text: string }).text)
           .join('')
+        console.log(`[webhook] iter ${i} text (first 100):`, finalReply.substring(0, 100))
         break
       }
 
       const toolUseBlocks  = response.content.filter(b => b.type === 'tool_use')
+      console.log(`[webhook] iter ${i} tools called:`, toolUseBlocks.map(b => b.type === 'tool_use' ? b.name : '').join(','))
       const toolResults: Array<{ type: 'tool_result'; tool_use_id: string; content: string }> = []
 
       await Promise.all(toolUseBlocks.map(async block => {
@@ -234,6 +241,7 @@ export async function POST(req: NextRequest) {
             const data = await res.json()
             console.log('[book_appointment] success:', data.appointmentId, 'calLink:', !!data.calendarLink)
             result = data.message || 'Cita agendada exitosamente.'
+            bookingConfirmation = result
             if (data.calendarLink) calendarLink = data.calendarLink
           } catch (err) {
             console.error('[book_appointment tool]', err)
@@ -251,8 +259,8 @@ export async function POST(req: NextRequest) {
       ]
     }
 
-    console.log('[webhook] loop done — finalReply:', !!finalReply, 'calendarLink:', !!calendarLink)
-    if (!finalReply) finalReply = 'No pude procesar tu mensaje. Por favor intenta de nuevo.'
+    console.log('[webhook] loop done — finalReply:', !!finalReply, 'calendarLink:', !!calendarLink, 'bookingConfirmation:', !!bookingConfirmation)
+    if (!finalReply) finalReply = bookingConfirmation || 'No pude procesar tu mensaje. Por favor intenta de nuevo.'
     if (calendarLink) finalReply += `\n\n📅 Agrega al calendario: ${calendarLink}`
 
     // Guardar en background (no bloqueante)
